@@ -1,156 +1,151 @@
 // ==UserScript==
-// @name         BC.GAME Design — Minimal Header v2.0
+// @name         BC.GAME Design — Minimal Header v2.1
 // @namespace    https://github.com/blatokomitet/bcgame-design
-// @version      0.3.0
-// @description  Minimal Header v2.0: автоматическое применение после загрузки страницы
+// @version      0.3.1
+// @description  Minimal Header: compact balance and gift overflow; safe opt-in DOM changes
 // @match        https://bcgame.st/*
 // @match        https://*.bcgame.st/*
 // @match        https://bc.game/*
 // @match        https://*.bc.game/*
 // @updateURL    https://raw.githubusercontent.com/blatokomitet/bcgame-design/main/bcgame.user.js
 // @downloadURL  https://raw.githubusercontent.com/blatokomitet/bcgame-design/main/bcgame.user.js
-// @grant        none
 // @run-at       document-idle
+// @grant        none
 // ==/UserScript==
 
-// Automatically apply header experiment when SPA header is ready.
-// No changes to the bottom navigation, sports cards or colors.
 (() => {
   'use strict';
-  const tryStart = () => {
-    if (window.bcMinimalHeaderRestore || !document.querySelector('.page-header')) return false;
-    (() => {
-  'use strict';
-  window.bcMinimalHeaderRestore?.();
-
-  const header = document.querySelector('.page-header');
-  const logo = header?.querySelector('a.active');
-  const deposit = header?.querySelector('button.button-brand');
-  const balance = deposit?.parentElement;
-  const gift = balance?.parentElement?.querySelector('button.bg-alw_white');
-  const nativeButtons = header
-    ? [...header.querySelectorAll('button')]
-        .filter(el => el.getBoundingClientRect().width > 0)
-    : [];
-  const bell = nativeButtons.find(el => el !== deposit && el !== gift &&
-    el.querySelector('svg') && !el.querySelector('img'));
-  const avatar = nativeButtons.find(el => el.querySelector('img[alt="avatar"]'));
-
-  if (!header || !logo || !deposit || !balance || !gift || !bell || !avatar ||
-      balance.parentElement !== gift.parentElement ||
-      balance.parentElement !== avatar.parentElement ||
-      window.innerWidth < 390 || window.innerWidth > 430) {
-    console.warn('BC Minimal Header: structure or viewport differs; no changes.');
-    return;
-  }
-
-  const right = balance.parentElement;
-  const saved = [];
-  const put = (el, property, value) => {
-    saved.push([el, property, el.style.getPropertyValue(property),
-      el.style.getPropertyPriority(property)]);
-    el.style.setProperty(property, value, 'important');
-  };
-  const menu = document.createElement('button');
-  const popover = document.createElement('div');
-  const giftAction = document.createElement('button');
-  let listening = false;
-  const close = event => {
-    if (!menu.contains(event.target) && !popover.contains(event.target)) {
-      popover.hidden = true;
-      menu.setAttribute('aria-expanded', 'false');
-    }
-  };
-  const restore = () => {
-    if (listening) document.removeEventListener('click', close);
-    menu.remove();
-    popover.remove();
-    for (const [el, prop, value, priority] of saved.reverse()) {
-      if (value) el.style.setProperty(prop, value, priority);
-      else el.style.removeProperty(prop);
-    }
-    delete window.bcMinimalHeaderRestore;
-  };
-
-  try {
-    menu.type = 'button';
-    menu.textContent = '⋯';
-    menu.setAttribute('aria-label', 'Дополнительные функции');
-    menu.setAttribute('aria-expanded', 'false');
-    menu.style.cssText = 'display:flex;align-items:center;justify-content:center;width:34px;min-width:34px;height:38px;padding:0;border:0;border-radius:8px;color:inherit;background:var(--bg-white-alpha5,rgba(255,255,255,.05));font-family:inherit;font-size:22px;line-height:1;cursor:pointer;flex:0 0 34px;';
-    menu.addEventListener('click', event => {
-      event.stopPropagation();
-      popover.hidden = !popover.hidden;
-      menu.setAttribute('aria-expanded', String(!popover.hidden));
-    });
-    popover.hidden = true;
-    popover.style.cssText = 'position:fixed;top:51px;right:12px;z-index:100001;padding:8px;border-radius:12px;background:#25302e;color:white;box-shadow:0 8px 28px #0007;';
-    giftAction.type = 'button';
-    giftAction.textContent = '🎁 Подарки и бонусы';
-    giftAction.style.cssText = 'border:0;background:transparent;color:inherit;padding:12px;font-size:14px;cursor:pointer;';
-    giftAction.addEventListener('click', () => {
-      popover.hidden = true;
-      menu.setAttribute('aria-expanded', 'false');
-      gift.click();
-    });
-    popover.appendChild(giftAction);
-    right.insertBefore(menu, avatar);
-    document.body.appendChild(popover);
-    put(gift, 'display', 'none');
-    put(header, 'height', '47px');
-    put(balance, 'transform', 'none');
-    put(balance, 'width', '222px');
-    put(balance, 'max-width', '222px');
-    put(balance, 'flex', '0 0 222px');
-    put(balance, 'margin-left', '-22px');
-    for (const button of [deposit, bell, avatar]) {
-      put(button, 'margin-left', '0px');
-      put(button, 'margin-right', '0px');
-      put(button, 'align-self', 'center');
-      put(button, 'flex-shrink', '0');
-    }
-    put(bell, 'width', '38px');
-    put(bell, 'height', '38px');
-    put(avatar, 'width', '42px');
-    put(avatar, 'height', '42px');
-
-    const l = logo.getBoundingClientRect();
-    const b = balance.getBoundingClientRect();
-    const d = deposit.getBoundingClientRect();
-    const n = bell.getBoundingClientRect();
-    const m = menu.getBoundingClientRect();
-    const a = avatar.getBoundingClientRect();
-    const valid = Math.abs(b.left - l.right - 12) < 5 &&
-      Math.abs(b.width - 222) < 5 &&
-      d.left >= b.left && d.right <= b.right &&
-      d.right <= n.left && n.right <= m.left && m.right <= a.left &&
-      a.right <= window.innerWidth;
-    if (!valid) {
-      restore();
-      console.warn('BC Minimal Header: geometry validation failed; restored.');
-      return;
-    }
-    document.addEventListener('click', close);
-    listening = true;
-    window.bcMinimalHeaderRestore = restore;
-    console.log({
-      status: 'Minimal Header v2.0 EXPERIMENT ACTIVE',
-      balanceX: Math.round(b.x),
-      balanceWidth: Math.round(b.width),
-      depositX: Math.round(d.x),
-      restore: 'bcMinimalHeaderRestore()'
-    });
-  } catch (error) {
-    restore();
-    console.error('BC Minimal Header: rolled back', error);
-  }
-})();
-
-    return !!window.bcMinimalHeaderRestore;
-  };
-  if (tryStart()) return;
+  const STATE = '__bcMinimalHeaderV21';
+  if (window[STATE]) return;
   let attempts = 0;
-  const timer = setInterval(() => {
-    if (tryStart() || ++attempts >= 40) clearInterval(timer);
-  }, 500);
+  let timer = null;
+  let active = null;
+
+  function activate() {
+    const header = document.querySelector('.page-header');
+    if (!header || window.innerWidth < 360) return false;
+    const logo = header.querySelector('a.active');
+    const deposit = header.querySelector('button.button-brand');
+    const balance = deposit?.parentElement;
+    const avatar = [...header.querySelectorAll('button')]
+      .find(b => b.querySelector('img[alt="avatar"]'));
+    if (!logo || !deposit || !balance || !avatar) return false;
+
+    const container = balance.parentElement;
+    if (!container || !container.contains(avatar)) return false;
+    const buttons = [...container.querySelectorAll('button')];
+    const gift = buttons.find(b => b !== deposit && b !== avatar &&
+      (b.classList.contains('bg-alw_white') || b.classList.contains('dark:bg-white_alpha5')));
+    const bell = buttons.find(b => b !== gift && b !== deposit && b !== avatar &&
+      b.querySelector('svg'));
+    if (!gift || !bell) return false;
+    const saved = [];
+    const set = (el, prop, value) => {
+      saved.push([el, prop, el.style.getPropertyValue(prop), el.style.getPropertyPriority(prop)]);
+      el.style.setProperty(prop, value, 'important');
+    };
+    const menu = document.createElement('button');
+    const popup = document.createElement('div');
+    const action = document.createElement('button');
+    let onOutside = null;
+    const restore = () => {
+      if (onOutside) document.removeEventListener('click', onOutside);
+      menu.remove();
+      popup.remove();
+      for (const [el, prop, value, priority] of saved.reverse()) {
+        if (value) el.style.setProperty(prop, value, priority);
+        else el.style.removeProperty(prop);
+      }
+      active = null;
+    };
+    try {
+      menu.type = 'button';
+      menu.textContent = '⋯';
+      menu.setAttribute('aria-label', 'Дополнительные функции');
+      menu.setAttribute('aria-expanded', 'false');
+      menu.style.cssText = 'display:flex;align-items:center;justify-content:center;width:34px;min-width:34px;height:38px;padding:0;border:0;border-radius:8px;color:inherit;background:rgba(255,255,255,.05);font:inherit;font-size:22px;line-height:1;cursor:pointer;flex:0 0 34px;';
+      popup.hidden = true;
+      popup.style.cssText = 'position:fixed;top:51px;right:12px;z-index:100001;padding:8px;border-radius:12px;background:#25302e;color:#fff;box-shadow:0 8px 28px #0007;';
+      action.type = 'button';
+      action.textContent = '🎁 Подарки и бонусы';
+      action.style.cssText = 'border:0;background:transparent;color:inherit;padding:12px;font-size:14px;cursor:pointer;';
+      action.addEventListener('click', () => {
+        popup.hidden = true;
+        menu.setAttribute('aria-expanded', 'false');
+        gift.click();
+      });
+      popup.append(action);
+      menu.addEventListener('click', event => {
+        event.stopPropagation();
+        popup.hidden = !popup.hidden;
+        menu.setAttribute('aria-expanded', String(!popup.hidden));
+      });
+      container.insertBefore(menu, avatar);
+      document.body.appendChild(popup);
+      set(gift, 'display', 'none');
+      set(header, 'height', '47px');
+      for (const b of [deposit,bell,avatar]) {
+        set(b,'margin-left','0px');
+        set(b,'margin-right','0px');
+        set(b,'align-self','center');
+        set(b,'flex-shrink','0');
+      }
+      set(bell,'width','38px');
+      set(bell,'height','38px');
+      set(avatar,'width','42px');
+      set(avatar,'height','42px');
+      // Prefer a regular flex adjustment, without translating the deposit button.
+      // Preserve the live layout if the device has less room.
+      const before = balance.getBoundingClientRect();
+      if (window.innerWidth >= 390 && before.width <= 205) {
+        set(balance,'transform','none');
+        set(balance,'width','222px');
+        set(balance,'max-width','222px');
+        set(balance,'flex','0 0 222px');
+        set(balance,'margin-left','-22px');
+      }
+      const rb = balance.getBoundingClientRect();
+      const rd = deposit.getBoundingClientRect();
+      const rn = bell.getBoundingClientRect();
+      const rm = menu.getBoundingClientRect();
+      const ra = avatar.getBoundingClientRect();
+      if (rd.right > rn.left + 1 || rn.right > rm.left + 1 ||
+          rm.right > ra.left + 1 || ra.right > window.innerWidth + 1 ||
+          rd.left < rb.left - 1 || rd.right > rb.right + 1) {
+        restore();
+        console.warn('[BC Header v2.1] insufficient room, restored');
+        return false;
+      }
+      onOutside = event => {
+        if (!menu.contains(event.target) && !popup.contains(event.target)) {
+          popup.hidden = true;
+          menu.setAttribute('aria-expanded', 'false');
+        }
+      };
+      document.addEventListener('click',onOutside);
+      active = { header, restore };
+      console.info('[BC Header v2.1] ACTIVE', {balanceX:Math.round(rb.x),balanceWidth:Math.round(rb.width),depositX:Math.round(rd.x)});
+      return true;
+    } catch (e) {
+      restore();
+      console.error('[BC Header v2.1] error', e);
+      return false;
+    }
+  }
+
+  const start = () => {
+    if (active && active.header.isConnected) return true;
+    if (active) active.restore();
+    return activate();
+  };
+  window[STATE] = {
+    status: () => ({ installed:true, active:!!active, attempts }),
+    restore: () => { if (timer) clearInterval(timer); active?.restore(); delete window[STATE]; }
+  };
+  if (!start()) {
+    timer = setInterval(() => {
+      attempts++;
+      if (start() || attempts >= 120) clearInterval(timer);
+    }, 500);
+  }
 })();
