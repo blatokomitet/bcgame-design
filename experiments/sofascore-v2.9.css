@@ -1,4 +1,4 @@
-/* Sofascore Compact v2.9 — standalone experimental CSS */
+/* Sofascore Compact v2.9.1 — consolidated published CSS */
 .sc-1nrofdy-1:has(> a.sc-1nrofdy-9) {
   background:transparent !important; border:0 !important; box-shadow:none !important;
   padding:0 !important; margin-bottom:12px !important; overflow:visible !important;
@@ -67,4 +67,72 @@ a.sc-1nrofdy-9 span.sc-1oeg2ad-1 {
   box-shadow:none !important; padding:0 !important; min-width:0 !important; color:#fff !important;
   font-weight:700 !important; line-height:1 !important; transform:scale(1.54545) !important;
   transform-origin:center center !important; font-variant-numeric:tabular-nums !important;
+}
+
+/* Consolidated console adjustments, published as v2.9.1.
+   Keep original team/logo links and prematch data intact. */
+.sc-1nrofdy-1:has(> a.sc-1nrofdy-9) {margin-bottom:4px !important;}
+.sc-1nrofdy-1:has(> a.sc-1nrofdy-9) > .sc-1nrofdy-2 {padding:2px 8px 4px !important;}
+a.sc-1nrofdy-9 {
+  min-height:116px !important; height:auto !important;
+  padding:12px 8px 12px 4px !important;
+  grid-template-columns:46px minmax(0,1fr) !important;
+  column-gap:16px !important;
+  align-items:center !important;
+}
+a.sc-1nrofdy-9 > .bc-v28-time {
+  color:#ff474c !important; font-size:18px !important; font-weight:700 !important;
+  width:46px !important; height:92px !important; align-self:center !important;
+  justify-self:stretch !important; justify-content:center !important;
+  text-align:center !important; box-sizing:border-box !important;
+  padding:0 10px 0 0 !important; margin:0 !important;
+}
+a.sc-1nrofdy-9 > .bc-v28-time::after {
+  width:1px !important; right:0 !important;
+  height:68px !important; background:#20d982 !important;
+}
+a.sc-1nrofdy-9 > .sc-1gh6pgx-0 {
+  min-height:92px !important; height:92px !important;
+  align-self:center !important; align-items:center !important;
+  grid-template-columns:minmax(0,1fr) 28px !important;
+}
+a.sc-1nrofdy-9 > .sc-1gh6pgx-0::after {
+  top:46px !important; right:42px !important;
+}
+a.sc-1nrofdy-9 .sc-1gh6pgx-2 {
+  height:46px !important; min-height:46px !important;
+  max-height:46px !important; align-items:center !important;
+}
+a.sc-1nrofdy-9 .sc-1gh6pgx-3 {
+  display:flex !important; align-items:center !important;
+  min-height:30px !important; gap:8px !important;
+}
+a.sc-1nrofdy-9 .jss52 {
+  font-size:15px !important; font-weight:600 !important;
+  line-height:1.25 !important; display:flex !important;
+  align-items:center !important; align-self:center !important;
+  min-height:26px !important; margin:0 !important; padding:0 !important;
+}
+a.sc-1nrofdy-9 .sc-tu0l0b-0 {
+  display:flex !important; align-items:center !important;
+  justify-content:center !important; flex-shrink:0 !important;
+}
+a.sc-1nrofdy-9 img.sc-tu0l0b-2 {
+  width:26px !important; height:26px !important; object-fit:contain !important;
+}
+a.sc-1nrofdy-9 .sc-7l8my2-0 {
+  width:28px !important; min-width:28px !important;
+  position:relative !important; left:-35px !important;
+  justify-self:end !important; align-items:center !important;
+  justify-content:center !important;
+}
+a.sc-1nrofdy-9 .sc-7l8my2-1 {
+  width:28px !important; min-width:28px !important;
+  height:46px !important; min-height:46px !important;
+  max-height:46px !important; justify-content:center !important;
+  padding:0 !important;
+}
+a.sc-1nrofdy-9 span.sc-1oeg2ad-1 {
+  color:#fff !important; background:transparent !important;
+  transform:scale(1.54545) !important;
 }
