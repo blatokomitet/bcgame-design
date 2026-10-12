@@ -1,9 +1,12 @@
 /* ==UserStyle==
 @name           BC.GAME Design — Safe Starter
 @namespace      github.com/blatokomitet/bcgame-design
-@version        0.1.0
-@description    Безопасная заготовка CSS; правила пока не активированы
+@version        0.2.0
+@description    Безопасная заготовка для Stylus; без активных CSS-правил
+@homepageURL    https://github.com/blatokomitet/bcgame-design
+@updateURL      https://raw.githubusercontent.com/blatokomitet/bcgame-design/main/bcgame.user.css
 ==/UserStyle== */
 
-/* Стили будем добавлять после проверки реальных селекторов BC.GAME.
-   Stylus не проникает обычными CSS-селекторами в Shadow DOM. */
+/* Пока без активных правил. Оформление матчей находится внутри Shadow DOM,
+   поэтому обычный Stylus не сможет изменить его из внешнего документа.
+   Дальнейший CSS подготавливаем отдельно и тестируем до включения. */
