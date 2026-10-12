@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         BC.GAME Design — Calm Dark 1.1
+// @name         BC.GAME Design — Calm Dark 1.0
 // @namespace    https://github.com/blatokomitet/bcgame-design
 // @version      1.1.0
 // @description  Approved backgrounds: matching header/nav, 30% transparent bottom bar, 13px body.
