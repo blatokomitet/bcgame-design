@@ -41,6 +41,8 @@
   const MARKS = new Map();
   let mainSurface = null;
   let timer = null;
+  const pending = new Set();
+  let disposed = false;
 
   function mark(el, attr) {
     if (!el || el.getAttribute(attr) === '1') return;
@@ -51,8 +53,13 @@
   }
 
   function schedule() {
-    if (timer !== null) return;
-    timer = setTimeout(() => { timer = null; refresh(); }, 350);
+    if (disposed || timer !== null) return;
+    timer = setTimeout(() => {
+      pending.delete(timer);
+      timer = null;
+      refresh();
+    }, 350);
+    pending.add(timer);
   }
 
   function addRoot(root) {
@@ -79,10 +86,12 @@
 
   function discoverRoots() {
     const queue = [document];
+    const traversed = new Set();
     while (queue.length) {
       const root = queue.shift();
-      if (ROOTS.has(root)) continue;
-      addRoot(root);
+      if (traversed.has(root)) continue;
+      traversed.add(root);
+      if (!ROOTS.has(root)) addRoot(root);
       for (const el of root.querySelectorAll('*')) {
         if (el.shadowRoot) queue.push(el.shadowRoot);
       }
@@ -144,6 +153,7 @@
   }
 
   function refresh() {
+    if (disposed) return;
     discoverRoots();
     paintNavigation();
     if (!mainSurface || !mainSurface.isConnected) {
@@ -153,7 +163,10 @@
   }
 
   function restore() {
-    if (timer !== null) clearTimeout(timer);
+    disposed = true;
+    for (const id of pending) clearTimeout(id);
+    pending.clear();
+    timer = null;
     for (const observer of OBSERVERS) observer.disconnect();
     for (const style of STYLES) style.remove();
     for (const [el, attrs] of MARKS) {
@@ -182,5 +195,11 @@
   };
   refresh();
   // Covers late-loaded components without continuously rescanning live odds.
-  [800, 2500, 7000].forEach(delay => setTimeout(refresh, delay));
+  [800, 2500, 7000].forEach(delay => {
+    const id = setTimeout(() => {
+      pending.delete(id);
+      refresh();
+    }, delay);
+    pending.add(id);
+  });
 })();
