@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         BC.GAME Design — Calm Dark 1.0
+// @name         BC.GAME Design — Calm Dark 1.1
 // @namespace    https://github.com/blatokomitet/bcgame-design
-// @version      1.0.0
-// @description  Approved four background colors and 13px body font; no other changes.
+// @version      1.1.0
+// @description  Approved backgrounds: matching header/nav, 30% transparent bottom bar, 13px body.
 // @match        https://bcgame.st/*
 // @match        https://*.bcgame.st/*
 // @match        https://bc.game/*
@@ -19,15 +19,16 @@
   if (window[KEY]) return;
   const COLOR = Object.freeze({
     page: '#202126',
-    header: '#1C1C21',
+    header: '#19191E',
     sports: '#19191E',
-    bottom: '#222228'
+    bottom: 'rgba(34, 34, 40, 0.7)'
   });
   const CSS = [
     'html, body { background-color: #202126 !important; }',
     'body { font-size: 13px !important; }',
-    '.page-header { background-color: #1C1C21 !important; }',
-    '.tabbar { background-color: #222228 !important; }',
+    '.page-header { background-color: #19191E !important; }',
+    '.tabbar { background-color: rgba(34,34,40,0.7) !important; }',
+    '.tabbar [data-bc-calm-bottom-layer="1"] { background-color: transparent !important; }',
     '[data-bc-calm-sports="1"] { background-color: #19191E !important; }',
     '[data-bc-calm-surface="1"] { background-color: #202126 !important; }'
   ].join('\n');
@@ -114,6 +115,28 @@
     }
   }
 
+  // An opaque full-size inner layer otherwise hides the translucent tabbar.
+  // Clear only the background of such layers; leave icons and click targets alone.
+  function prepareBottomLayers() {
+    for (const root of ROOTS) {
+      for (const nav of root.querySelectorAll('.tabbar')) {
+        const bar = nav.getBoundingClientRect();
+        if (bar.width < 200 || bar.height < 35) continue;
+        for (const el of nav.querySelectorAll('div')) {
+          const r = el.getBoundingClientRect();
+          if (r.width >= bar.width * 0.90 &&
+              r.height >= bar.height * 0.80 &&
+              r.height <= bar.height + 4) {
+            const bg = getComputedStyle(el).backgroundColor;
+            if (bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') {
+              mark(el, 'data-bc-calm-bottom-layer');
+            }
+          }
+        }
+      }
+    }
+  }
+
   function neutralDark(color) {
     const m = color.match(/^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/);
     if (!m) return false;
@@ -156,6 +179,7 @@
     if (disposed) return;
     discoverRoots();
     paintNavigation();
+    prepareBottomLayers();
     if (!mainSurface || !mainSurface.isConnected) {
       mainSurface = findMainSurface();
       if (mainSurface) mark(mainSurface, 'data-bc-calm-surface');
