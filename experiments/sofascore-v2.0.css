@@ -1,0 +1,58 @@
+/* BC.GAME Sofascore v2.0 experimental CSS
+   Scoped to soccer match links in the site's open Shadow DOM.
+   No inline score mutations. Site-generated class names may change.
+*/
+.sc-1nrofdy-1:has(> a.sc-1nrofdy-9) > div:nth-child(3) {
+  display: none !important;
+}
+.sc-1nrofdy-1:has(> a.sc-1nrofdy-9)
+  > .sc-1nrofdy-2 > .sc-1nrofdy-3:last-child {
+  display: none !important;
+}
+a.sc-1nrofdy-9 {
+  box-sizing: border-box !important;
+  min-height: 0 !important;
+  height: auto !important;
+  padding: 8px 12px !important;
+}
+a.sc-1nrofdy-9 .sc-16ixfl8-0 {
+  color: #20d982 !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+}
+a.sc-1nrofdy-9 .jss52 {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+}
+a.sc-1nrofdy-9 img.sc-tu0l0b-2 {
+  width: 26px !important;
+  height: 26px !important;
+  object-fit: contain !important;
+}
+a.sc-1nrofdy-9 .sc-7l8my2-0 {
+  min-width: 42px !important;
+  flex: 0 0 42px !important;
+  gap: 0 !important;
+  transform: none !important;
+}
+a.sc-1nrofdy-9 .sc-7l8my2-1 {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 32px !important;
+  height: 32px !important;
+  width: 40px !important;
+  min-width: 40px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+a.sc-1nrofdy-9 span.sc-1oeg2ad-1 {
+  font-size: 21px !important;
+  font-weight: 800 !important;
+  line-height: 1 !important;
+  color: #20d982 !important;
+  font-variant-numeric: tabular-nums !important;
+}
