@@ -1,0 +1,9 @@
+/* ==UserStyle==
+@name           BC.GAME Design — Safe Starter
+@namespace      github.com/blatokomitet/bcgame-design
+@version        0.1.0
+@description    Безопасная заготовка CSS; правила пока не активированы
+==/UserStyle== */
+
+/* Стили будем добавлять после проверки реальных селекторов BC.GAME.
+   Stylus не проникает обычными CSS-селекторами в Shadow DOM. */
