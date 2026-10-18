@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         BC.GAME Design — Calm Dark 1.0
 // @namespace    https://github.com/blatokomitet/bcgame-design
-// @version      1.2.0
-// @description  Calm graphite, compact pinned gradient dock, 13px body font.
+// @version      1.2.1
+// @description  Calm graphite, stable fixed 70% gradient dock, 13px body font.
 // @match        https://bcgame.st/*
 // @match        https://*.bcgame.st/*
 // @match        https://bc.game/*
@@ -110,110 +110,93 @@
   function center(r) { return (r.left + r.right) / 2; }
 
   function applyDock() {
-    if (window.innerWidth >= 600) return;
+    if (disposed || document.documentElement.clientWidth >= 600) return;
     let bar = null;
     for (const root of ROOTS) {
       bar = root.querySelector('.tabbar');
       if (bar) break;
     }
-    if (!bar) return;
-    if (dock === bar && bar.isConnected) return;
+    if (!bar || !bar.isConnected) return;
 
-    if (dockObserver) dockObserver.disconnect();
-    dockObserver = null;
-    dock = bar;
+    // In Chrome Android the address bar changes the viewport height.
+    // Never restore the old 105% transform and recalculate Y on resize:
+    // that caused the full-width dock to flash back during scrolling.
+    const newBar = dock !== bar;
+    if (newBar && dockObserver) dockObserver.disconnect();
+    if (newBar) dock = bar;
 
-    // The site's original inline background can outrank our injected CSS.
-    // Apply the approved gradient to the dock element itself, not its icons.
+    const naturalWidth = bar.offsetWidth;
+    const viewportWidth = document.documentElement.clientWidth;
+    const scaleFactor = viewportWidth * 0.7 / naturalWidth;
+    if (!naturalWidth || scaleFactor < 0.3 || scaleFactor > 1.5) return;
+
+    // Explicit CSS-fixed anchoring: the browser adjusts bottom:16px when
+    // its address bar hides/shows. No JS adjustment based on innerHeight.
+    override(bar, 'position', 'fixed');
+    override(bar, 'top', 'auto');
+    override(bar, 'left', '50%');
+    override(bar, 'right', 'auto');
+    override(bar, 'bottom', '16px');
+    override(bar, 'transform-origin', 'center bottom');
+    override(bar, 'scale', 'none');
+    override(bar, 'translate', 'none');
+    override(bar, 'transform',
+      'translateX(-50%) scale(' + scaleFactor.toFixed(7) + ')');
+    override(bar, 'transition', 'none');
+    override(bar, 'animation', 'none');
     override(bar, 'background-color', COLOR.bottom);
     override(bar, 'background-image',
       'linear-gradient(160deg,#363941 0%,#2B2E35 48%,#22252B 100%)');
     override(bar, 'box-shadow',
       '0 -6px 18px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.05)');
-    const before = bar.getBoundingClientRect();
-    const naturalWidth = bar.offsetWidth;
-    const targetWidth = document.documentElement.clientWidth * 0.7;
-    if (!naturalWidth || before.width < 160) return;
-    const props = ['position','top','bottom','left','right','transform',
-      'transform-origin','scale','translate','transition','animation'];
-    const beforeTransform = getComputedStyle(bar).transform;
 
-    // Keep the site's original transform as a pinned baseline, then use
-    // independent scale/translate properties to size/align this dock.
-    override(bar, 'position', 'fixed');
-    override(bar, 'top', 'auto');
-    override(bar, 'bottom', getComputedStyle(bar).bottom);
-    override(bar, 'left', getComputedStyle(bar).left);
-    override(bar, 'transform', beforeTransform === 'none' ? 'none' : beforeTransform);
-    override(bar, 'transform-origin', 'center bottom');
-    override(bar, 'transition', 'none');
-    override(bar, 'animation', 'none');
-    const scale = targetWidth / before.width;
-    override(bar, 'scale', String(scale));
-    override(bar, 'translate', '0px 0px');
-
-    const baseline = bar.getBoundingClientRect();
-    override(bar, 'translate', '10px 0px');
-    const trialX = bar.getBoundingClientRect();
-    override(bar, 'translate', '0px 10px');
-    const trialY = bar.getBoundingClientRect();
-    const gainX = (center(trialX) - center(baseline)) / 10;
-    const gainY = (trialY.bottom - baseline.bottom) / 10;
-
-    let ok = false;
-    if (Math.abs(gainX) > 0.1 && Math.abs(gainY) > 0.1) {
-      const dx = (document.documentElement.clientWidth / 2 - center(baseline)) / gainX;
-      const dy = (window.innerHeight - 16 - baseline.bottom) / gainY;
-      override(bar, 'translate', dx.toFixed(3) + 'px ' + dy.toFixed(3) + 'px');
-      const after = bar.getBoundingClientRect();
-      ok = Math.abs(after.width - targetWidth) <= 3 &&
-        Math.abs(center(after) - document.documentElement.clientWidth / 2) <= 3 &&
-        Math.abs(window.innerHeight - after.bottom - 16) <= 3;
-      if (ok) {
-        lastDockMetrics = { width: Math.round(after.width),
-          bottomGap: Math.round(window.innerHeight - after.bottom) };
-      }
+    const rect = bar.getBoundingClientRect();
+    const widthGood = Math.abs(rect.width - viewportWidth * 0.7) <= 3;
+    const centerGood = Math.abs(center(rect) - viewportWidth / 2) <= 3;
+    const bottomGood = Math.abs(window.innerHeight - rect.bottom - 16) <= 4;
+    if (!widthGood || !centerGood || !bottomGood) {
+      lastDockMetrics = { status: 'CHECK_REQUIRED',
+        width: Math.round(rect.width), centered: centerGood,
+        bottomGap: Math.round(window.innerHeight - rect.bottom) };
+      console.warn('[BC Calm Dark] Dock needs visual inspection', lastDockMetrics);
+    } else {
+      lastDockMetrics = { status: 'PINNED',
+        width: Math.round(rect.width), bottomGap: 16 };
     }
 
-    if (!ok) {
-      resetOverrides(bar, props);
-      lastDockMetrics = { status: 'SKIPPED: geometry check failed' };
-      console.warn('[BC Calm Dark] Dock geometry unchanged (safety check)');
-      return;
-    }
-
-    // Only restores properties this script itself pinned, if another script
-    // tries to animate the dock during scrolling. No DOM changes on matches.
-    dockObserver = new MutationObserver(() => {
-      const rules = OVERRIDES.get(bar);
-      if (!bar.isConnected || !rules || disposed) return;
-      for (const [prop, entry] of rules) {
-        if (['position','top','bottom','left','transform','transform-origin','scale',
-             'translate','transition','animation','background-color',
-             'background-image','box-shadow'].includes(prop)) {
-          if (bar.style.getPropertyValue(prop) !== entry.value ||
-              bar.style.getPropertyPriority(prop) !== 'important') {
+    // Prevent other userscripts from animating the bar into full width.
+    // Ignore mutations caused by our own changes, preventing a loop.
+    if (newBar) {
+      dockObserver = new MutationObserver(() => {
+        const rules = OVERRIDES.get(bar);
+        if (disposed || !bar.isConnected || !rules) return;
+        for (const prop of ['position', 'top', 'left', 'right', 'bottom',
+          'transform', 'transform-origin', 'scale', 'translate',
+          'transition', 'animation', 'background-color',
+          'background-image', 'box-shadow']) {
+          const entry = rules.get(prop);
+          if (entry && (bar.style.getPropertyValue(prop) !== entry.value ||
+              bar.style.getPropertyPriority(prop) !== 'important')) {
             bar.style.setProperty(prop, entry.value, 'important');
           }
         }
-      }
-    });
-    dockObserver.observe(bar, { attributes: true, attributeFilter: ['style'] });
+      });
+      dockObserver.observe(bar, {
+        attributes: true,
+        attributeFilter: ['style']
+      });
+    }
   }
 
   function resizeDock() {
     if (disposed || resizeTimer !== null) return;
     resizeTimer = setTimeout(() => {
       resizeTimer = null;
-      if (dock) {
-        if (dockObserver) dockObserver.disconnect();
-        dockObserver = null;
-        resetOverrides(dock, ['position','top','bottom','left','right','transform',
-          'transform-origin','scale','translate','transition','animation']);
-        dock = null;
-      }
-      applyDock();
-    }, 180);
+      // Updating transform at the same element is safe; do not unpin.
+      // Height changes require no adjustment because bottom:16px is fixed.
+      if (dock && dock.isConnected) applyDock();
+      else { dock = null; applyDock(); }
+    }, 220);
   }
 
   function schedule() {
