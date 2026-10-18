@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         BC.GAME Design — Minimal Header v2.1
 // @namespace    https://github.com/blatokomitet/bcgame-design
-// @version      0.3.1
-// @description  Minimal Header: compact balance and gift overflow; safe opt-in DOM changes
+// @version      0.3.2
+// @description  Minimal Header: compact balance, gift overflow, 360px logo-fit guard
 // @match        https://bcgame.st/*
 // @match        https://*.bcgame.st/*
 // @match        https://bc.game/*
@@ -103,6 +103,51 @@
         set(balance,'max-width','222px');
         set(balance,'flex','0 0 222px');
         set(balance,'margin-left','-22px');
+      }
+      // At 360-389px the original outer padding (10px per side) can
+      // squeeze the BC.GAME logo to 18px. Reclaim side padding and
+      // the row gap rather than reducing the wallet or covering actions.
+      // This applies only to the compact layout; the 390px+ layout
+      // continues to use its previously approved sizing.
+      if (window.innerWidth >= 360 && window.innerWidth < 390) {
+        const logoGroup = logo.parentElement;
+        const row = logoGroup?.parentElement;
+        const image = logo.querySelector('img');
+        if (row && row.contains(container) && image) {
+          const checkpoint = saved.length;
+          const rightWidth = Math.ceil(container.getBoundingClientRect().width);
+          set(row, 'padding-left', '2px');
+          set(row, 'padding-right', '2px');
+          set(row, 'column-gap', '1px');
+          set(logoGroup, 'flex', '0 0 35px');
+          set(logoGroup, 'width', '35px');
+          set(logoGroup, 'min-width', '35px');
+          set(logo, 'flex', '0 0 35px');
+          set(logo, 'width', '35px');
+          set(logo, 'min-width', '35px');
+          set(logo, 'flex-shrink', '0');
+          set(image, 'width', '35px');
+          set(image, 'height', '35px');
+          set(image, 'min-width', '35px');
+          set(image, 'max-width', 'none');
+          set(image, 'object-fit', 'contain');
+          set(container, 'flex', '0 0 ' + rightWidth + 'px');
+
+          const l = logo.getBoundingClientRect();
+          const i = image.getBoundingClientRect();
+          const b = balance.getBoundingClientRect();
+          const a = avatar.getBoundingClientRect();
+          const fit = l.width >= 34 && i.width >= 34 &&
+            b.left >= l.right + 1 && a.right <= window.innerWidth - 1 &&
+            b.width >= 165;
+          if (!fit) {
+            for (const [el, prop, value, priority] of saved.splice(checkpoint).reverse()) {
+              if (value) el.style.setProperty(prop, value, priority);
+              else el.style.removeProperty(prop);
+            }
+            console.warn('[BC Header v2.1] compact logo fit unavailable; preserved original layout');
+          }
+        }
       }
       const rb = balance.getBoundingClientRect();
       const rd = deposit.getBoundingClientRect();
