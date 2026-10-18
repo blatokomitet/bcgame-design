@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BC.GAME Design — Minimal Header v2.1
 // @namespace    https://github.com/blatokomitet/bcgame-design
-// @version      0.3.2
+// @version      0.3.3
 // @description  Minimal Header: compact balance, gift overflow, 360px logo-fit guard
 // @match        https://bcgame.st/*
 // @match        https://*.bcgame.st/*
@@ -116,9 +116,12 @@
         if (row && row.contains(container) && image) {
           const checkpoint = saved.length;
           const rightWidth = Math.ceil(container.getBoundingClientRect().width);
-          set(row, 'padding-left', '2px');
-          set(row, 'padding-right', '2px');
-          set(row, 'column-gap', '1px');
+          // The row's space-between was redistributing reclaimed space
+          // back into a wide gap; pin a small 2px gap explicitly.
+          set(row, 'padding-left', '0px');
+          set(row, 'padding-right', '0px');
+          set(row, 'justify-content', 'flex-start');
+          set(row, 'column-gap', '2px');
           set(logoGroup, 'flex', '0 0 35px');
           set(logoGroup, 'width', '35px');
           set(logoGroup, 'min-width', '35px');
@@ -169,7 +172,7 @@
       };
       document.addEventListener('click',onOutside);
       active = { header, restore };
-      console.info('[BC Header v2.1] ACTIVE', {balanceX:Math.round(rb.x),balanceWidth:Math.round(rb.width),depositX:Math.round(rd.x)});
+      console.info('[BC Header v2.1] ACTIVE', {scriptVersion:'0.3.3',logoWidth:Math.round(logo.getBoundingClientRect().width),balanceX:Math.round(rb.x),balanceWidth:Math.round(rb.width),depositX:Math.round(rd.x)});
       return true;
     } catch (e) {
       restore();
@@ -184,7 +187,7 @@
     return activate();
   };
   window[STATE] = {
-    status: () => ({ installed:true, active:!!active, attempts }),
+    status: () => ({ installed:true, version:'0.3.3', active:!!active, attempts }),
     restore: () => { if (timer) clearInterval(timer); active?.restore(); delete window[STATE]; }
   };
   if (!start()) {
