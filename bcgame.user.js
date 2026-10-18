@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BC.GAME Design — Minimal Header v2.1
 // @namespace    https://github.com/blatokomitet/bcgame-design
-// @version      0.3.4
+// @version      0.3.5
 // @description  Minimal Header: compact balance, gift overflow, 360px logo-fit guard
 // @match        https://bcgame.st/*
 // @match        https://*.bcgame.st/*
@@ -117,12 +117,13 @@
         if (row && row.contains(container) && image) {
           const checkpoint = saved.length;
           const rightWidth = Math.ceil(container.getBoundingClientRect().width);
-          // The row's space-between was redistributing reclaimed space
-          // back into a wide gap; pin a small 2px gap explicitly.
+          // Keep the two groups distributed across the full row. With
+          // 360px viewport the row has 346px: logo 35px + actions 304px,
+          // leaving roughly 7px of separation. flex-start caused overlap.
           set(row, 'padding-left', '0px');
           set(row, 'padding-right', '0px');
-          set(row, 'justify-content', 'flex-start');
-          set(row, 'column-gap', '2px');
+          set(row, 'justify-content', 'space-between');
+          set(row, 'column-gap', '0px');
           set(logoGroup, 'flex', '0 0 35px');
           set(logoGroup, 'width', '35px');
           set(logoGroup, 'min-width', '35px');
@@ -134,8 +135,10 @@
           set(image, 'height', '35px');
           set(image, 'min-width', '35px');
           set(image, 'max-width', 'none');
+          set(image, 'max-height', 'none');
           set(image, 'object-fit', 'contain');
           set(container, 'flex', '0 0 ' + rightWidth + 'px');
+          set(container, 'flex-shrink', '0');
 
           const measure = () => {
             const l = logo.getBoundingClientRect();
@@ -150,6 +153,8 @@
               imageHeight: Math.round(i.height),
               gap: Math.round((b.left - l.right) * 10) / 10,
               balanceWidth: Math.round(b.width),
+              rowWidth: Math.round(row.getBoundingClientRect().width),
+              rightGroupWidth: Math.round(container.getBoundingClientRect().width),
               avatarRight: Math.round(a.right),
               ok: g.width >= 34 && l.width >= 34 &&
                 i.width >= 28 && i.height >= 28 &&
@@ -203,7 +208,7 @@
       };
       document.addEventListener('click',onOutside);
       active = { header, restore };
-      console.info('[BC Header v2.1] ACTIVE', {scriptVersion:'0.3.4',logoWidth:Math.round(logo.getBoundingClientRect().width),balanceX:Math.round(rb.x),balanceWidth:Math.round(rb.width),depositX:Math.round(rd.x)});
+      console.info('[BC Header v2.1] ACTIVE', {scriptVersion:'0.3.5',logoWidth:Math.round(logo.getBoundingClientRect().width),balanceX:Math.round(rb.x),balanceWidth:Math.round(rb.width),depositX:Math.round(rd.x)});
       return true;
     } catch (e) {
       restore();
@@ -218,7 +223,7 @@
     return activate();
   };
   window[STATE] = {
-    status: () => ({ installed:true, version:'0.3.4', active:!!active, attempts, logoFit }),
+    status: () => ({ installed:true, version:'0.3.5', active:!!active, attempts, logoFit }),
     restore: () => { if (timer) clearInterval(timer); active?.restore(); delete window[STATE]; }
   };
   if (!start()) {
