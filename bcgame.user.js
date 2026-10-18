@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BC.GAME Design — Minimal Header v2.1
 // @namespace    https://github.com/blatokomitet/bcgame-design
-// @version      0.3.5
+// @version      0.3.6
 // @description  Minimal Header: compact balance, gift overflow, 360px logo-fit guard
 // @match        https://bcgame.st/*
 // @match        https://*.bcgame.st/*
@@ -105,86 +105,89 @@
         set(balance,'flex','0 0 222px');
         set(balance,'margin-left','-22px');
       }
-      // At 360-389px the original outer padding (10px per side) can
-      // squeeze the BC.GAME logo to 18px. Reclaim side padding and
-      // the row gap rather than reducing the wallet or covering actions.
-      // This applies only to the compact layout; the 390px+ layout
-      // continues to use its previously approved sizing.
+      // The mobile 360px header has two flex groups: the 18px logo box
+      // and a 304px controls group. Growing the logo flex item to 35px
+      // forces the controls to overlap. Instead, preserve the existing
+      // group widths and move their *visual* boxes into the spare 17px:
+      // about 8px to the left for the logo, 9px right for the controls.
+      // Derived from the successful Eruda geometry test on 360px.
       if (window.innerWidth >= 360 && window.innerWidth < 390) {
-        const logoGroup = logo.parentElement;
-        const row = logoGroup?.parentElement;
+        const logoBox = logo.parentElement;
         const image = logo.querySelector('img');
-        if (row && row.contains(container) && image) {
+        const row = logoBox?.parentElement;
+        if (logoBox && image && row?.contains(container)) {
           const checkpoint = saved.length;
-          const rightWidth = Math.ceil(container.getBoundingClientRect().width);
-          // Keep the two groups distributed across the full row. With
-          // 360px viewport the row has 346px: logo 35px + actions 304px,
-          // leaving roughly 7px of separation. flex-start caused overlap.
-          set(row, 'padding-left', '0px');
-          set(row, 'padding-right', '0px');
-          set(row, 'justify-content', 'space-between');
-          set(row, 'column-gap', '0px');
-          set(logoGroup, 'flex', '0 0 35px');
-          set(logoGroup, 'width', '35px');
-          set(logoGroup, 'min-width', '35px');
+          const logoBefore = logo.getBoundingClientRect();
+          const boxWidth = logoBox.getBoundingClientRect().width;
+          const balanceBefore = balance.getBoundingClientRect();
+          const viewport = document.documentElement.clientWidth;
+
+          set(logoBox, 'flex', '0 0 ' + boxWidth + 'px');
+          set(logoBox, 'width', boxWidth + 'px');
+          set(logoBox, 'min-width', boxWidth + 'px');
+          set(logoBox, 'max-width', boxWidth + 'px');
+
           set(logo, 'flex', '0 0 35px');
           set(logo, 'width', '35px');
           set(logo, 'min-width', '35px');
           set(logo, 'flex-shrink', '0');
-          set(image, 'width', '35px');
-          set(image, 'height', '35px');
-          set(image, 'min-width', '35px');
-          set(image, 'max-width', 'none');
-          set(image, 'max-height', 'none');
-          set(image, 'object-fit', 'contain');
-          set(container, 'flex', '0 0 ' + rightWidth + 'px');
-          set(container, 'flex-shrink', '0');
 
-          const measure = () => {
-            const l = logo.getBoundingClientRect();
-            const g = logoGroup.getBoundingClientRect();
-            const i = image.getBoundingClientRect();
-            const b = balance.getBoundingClientRect();
-            const d = deposit.getBoundingClientRect();
-            const a = avatar.getBoundingClientRect();
-            return {
-              logoWidth: Math.round(l.width),
-              imageWidth: Math.round(i.width),
-              imageHeight: Math.round(i.height),
-              gap: Math.round((b.left - l.right) * 10) / 10,
-              balanceWidth: Math.round(b.width),
-              rowWidth: Math.round(row.getBoundingClientRect().width),
-              rightGroupWidth: Math.round(container.getBoundingClientRect().width),
-              avatarRight: Math.round(a.right),
-              ok: g.width >= 34 && l.width >= 34 &&
-                i.width >= 28 && i.height >= 28 &&
-                b.left >= l.right - 0.5 &&
-                b.width >= 165 && a.right <= window.innerWidth + 1 &&
-                d.left >= b.left - 1 && d.right <= b.right + 1
-            };
-          };
-          // The BC.GAME image is an original rem-based asset (often 30px
-          // at this viewport). Its flex box must be 35px, but the image
-          // need only render legibly, not necessarily at exactly 35px.
-          // Requiring a 35px image caused valid layouts to roll back.
-          let check = measure();
-          if (!check.ok) {
-            // Preserve wallet and button sizes; reclaim only inter-button
-            // whitespace as a fallback on particularly narrow layouts.
-            set(row, 'column-gap', '0px');
-            set(container, 'column-gap', '3px');
-            check = measure();
+          set(image, 'width', '35px');
+          set(image, 'height', '30px');
+          set(image, 'max-width', 'none');
+          set(image, 'object-fit', 'contain');
+
+          const enlarged = logo.getBoundingClientRect();
+          const balRect = balance.getBoundingClientRect();
+          const avatarRect = avatar.getBoundingClientRect();
+          const required = Math.max(0, enlarged.right + 4 - balRect.left);
+          const freeRight = Math.max(0, viewport - 8 - avatarRect.right);
+          const moveRight = Math.min(required, freeRight);
+          const moveLeft = required - moveRight;
+
+          if (enlarged.left - moveLeft >= 8) {
+            set(logo, 'position', 'relative');
+            set(logo, 'left', -moveLeft + 'px');
+            set(container, 'position', 'relative');
+            set(container, 'left', moveRight + 'px');
           }
-          if (!check.ok) {
+
+          const l = logo.getBoundingClientRect();
+          const i = image.getBoundingClientRect();
+          const b = balance.getBoundingClientRect();
+          const d = deposit.getBoundingClientRect();
+          const n = bell.getBoundingClientRect();
+          const m = menu.getBoundingClientRect();
+          const av = avatar.getBoundingClientRect();
+          const gap = b.left - l.right;
+
+          const ok = l.width >= 34 && i.width >= 28 && i.height >= 28 &&
+            l.left >= 7 && gap >= 3 && av.right <= viewport - 7 &&
+            Math.abs(b.width - balanceBefore.width) <= 1 &&
+            d.left >= b.left - 1 && d.right <= b.right + 1 &&
+            d.right <= n.left + 1 && n.right <= m.left + 1 &&
+            m.right <= av.left + 1;
+
+          logoFit = {
+            state: ok ? 'FITTED' : 'ROLLED_BACK',
+            logoBefore: Math.round(logoBefore.width),
+            logoWidth: Math.round(l.width),
+            imageWidth: Math.round(i.width),
+            gap: Math.round(gap * 10) / 10,
+            balanceWidth: Math.round(b.width),
+            avatarRight: Math.round(av.right),
+            moveLeft: Math.round(moveLeft),
+            moveRight: Math.round(moveRight),
+            ok
+          };
+          if (!ok) {
             for (const [el, prop, value, priority] of saved.splice(checkpoint).reverse()) {
               if (value) el.style.setProperty(prop, value, priority);
               else el.style.removeProperty(prop);
             }
-            logoFit = { state: 'ROLLED_BACK', ...check };
-            console.warn('[BC Header v2.1] compact logo fit unavailable', logoFit);
+            console.warn('[BC Header v2.1] logo layout kept original', logoFit);
           } else {
-            logoFit = { state: 'FITTED', ...check };
-            console.info('[BC Header v2.1] compact logo fitted', logoFit);
+            console.info('[BC Header v2.1] logo fitted', logoFit);
           }
         }
       }
@@ -208,7 +211,7 @@
       };
       document.addEventListener('click',onOutside);
       active = { header, restore };
-      console.info('[BC Header v2.1] ACTIVE', {scriptVersion:'0.3.5',logoWidth:Math.round(logo.getBoundingClientRect().width),balanceX:Math.round(rb.x),balanceWidth:Math.round(rb.width),depositX:Math.round(rd.x)});
+      console.info('[BC Header v2.1] ACTIVE', {scriptVersion:'0.3.6',logoWidth:Math.round(logo.getBoundingClientRect().width),balanceX:Math.round(rb.x),balanceWidth:Math.round(rb.width),depositX:Math.round(rd.x)});
       return true;
     } catch (e) {
       restore();
@@ -223,7 +226,7 @@
     return activate();
   };
   window[STATE] = {
-    status: () => ({ installed:true, version:'0.3.5', active:!!active, attempts, logoFit }),
+    status: () => ({ installed:true, version:'0.3.6', active:!!active, attempts, logoFit }),
     restore: () => { if (timer) clearInterval(timer); active?.restore(); delete window[STATE]; }
   };
   if (!start()) {
