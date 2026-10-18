@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BC.GAME Design — Minimal Header v2.1
 // @namespace    https://github.com/blatokomitet/bcgame-design
-// @version      0.3.6
+// @version      0.3.7
 // @description  Minimal Header: compact balance, gift overflow, 360px logo-fit guard
 // @match        https://bcgame.st/*
 // @match        https://*.bcgame.st/*
@@ -140,12 +140,26 @@
           const enlarged = logo.getBoundingClientRect();
           const balRect = balance.getBoundingClientRect();
           const avatarRect = avatar.getBoundingClientRect();
-          const required = Math.max(0, enlarged.right + 4 - balRect.left);
-          const freeRight = Math.max(0, viewport - 8 - avatarRect.right);
+          // A fixed 4px gap was 2-3px too wide on the actual 360px
+          // viewport. Derive an attainable positive gap from *both*
+          // edge margins, then never move farther than those margins.
+          const minLogoLeft = 7;
+          const minAvatarRightMargin = 8;
+          const freeLeft = Math.max(0, enlarged.left - minLogoLeft);
+          const freeRight = Math.max(
+            0, viewport - minAvatarRightMargin - avatarRect.right
+          );
+          const currentGap = balRect.left - enlarged.right;
+          const maxGap = currentGap + freeLeft + freeRight;
+          // Keep half a pixel of tolerance for fractional CSS pixels.
+          const targetGap = Math.min(4, maxGap - 0.5);
+          const possible = targetGap >= 1;
+          const required = possible
+            ? Math.max(0, targetGap - currentGap) : 0;
           const moveRight = Math.min(required, freeRight);
           const moveLeft = required - moveRight;
 
-          if (enlarged.left - moveLeft >= 8) {
+          if (possible && moveLeft <= freeLeft + 0.01) {
             set(logo, 'position', 'relative');
             set(logo, 'left', -moveLeft + 'px');
             set(container, 'position', 'relative');
@@ -162,7 +176,7 @@
           const gap = b.left - l.right;
 
           const ok = l.width >= 34 && i.width >= 28 && i.height >= 28 &&
-            l.left >= 7 && gap >= 3 && av.right <= viewport - 7 &&
+            l.left >= 7 && gap >= 0.9 && av.right <= viewport - 7 &&
             Math.abs(b.width - balanceBefore.width) <= 1 &&
             d.left >= b.left - 1 && d.right <= b.right + 1 &&
             d.right <= n.left + 1 && n.right <= m.left + 1 &&
@@ -174,6 +188,9 @@
             logoWidth: Math.round(l.width),
             imageWidth: Math.round(i.width),
             gap: Math.round(gap * 10) / 10,
+            targetGap: Math.round(targetGap * 10) / 10,
+            maxGap: Math.round(maxGap * 10) / 10,
+            logoLeft: Math.round(l.left * 10) / 10,
             balanceWidth: Math.round(b.width),
             avatarRight: Math.round(av.right),
             moveLeft: Math.round(moveLeft),
@@ -211,7 +228,7 @@
       };
       document.addEventListener('click',onOutside);
       active = { header, restore };
-      console.info('[BC Header v2.1] ACTIVE', {scriptVersion:'0.3.6',logoWidth:Math.round(logo.getBoundingClientRect().width),balanceX:Math.round(rb.x),balanceWidth:Math.round(rb.width),depositX:Math.round(rd.x)});
+      console.info('[BC Header v2.1] ACTIVE', {scriptVersion:'0.3.7',logoWidth:Math.round(logo.getBoundingClientRect().width),balanceX:Math.round(rb.x),balanceWidth:Math.round(rb.width),depositX:Math.round(rd.x)});
       return true;
     } catch (e) {
       restore();
@@ -226,7 +243,7 @@
     return activate();
   };
   window[STATE] = {
-    status: () => ({ installed:true, version:'0.3.6', active:!!active, attempts, logoFit }),
+    status: () => ({ installed:true, version:'0.3.7', active:!!active, attempts, logoFit }),
     restore: () => { if (timer) clearInterval(timer); active?.restore(); delete window[STATE]; }
   };
   if (!start()) {
