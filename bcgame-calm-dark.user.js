@@ -120,6 +120,13 @@
     dockObserver = null;
     dock = bar;
 
+    // The site's original inline background can outrank our injected CSS.
+    // Apply the approved gradient to the dock element itself, not its icons.
+    override(bar, 'background-color', COLOR.bottom);
+    override(bar, 'background-image',
+      'linear-gradient(160deg,#363941 0%,#2B2E35 48%,#22252B 100%)');
+    override(bar, 'box-shadow',
+      '0 -6px 18px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.05)');
     const before = bar.getBoundingClientRect();
     const naturalWidth = bar.offsetWidth;
     const targetWidth = document.documentElement.clientWidth * 0.7;
@@ -177,7 +184,8 @@
       if (!bar.isConnected || !rules || disposed) return;
       for (const [prop, entry] of rules) {
         if (['position','top','transform','transform-origin','scale',
-             'translate','transition','animation'].includes(prop)) {
+             'translate','transition','animation','background-color',
+             'background-image','box-shadow'].includes(prop)) {
           if (bar.style.getPropertyValue(prop) !== entry.value ||
               bar.style.getPropertyPriority(prop) !== 'important') {
             bar.style.setProperty(prop, entry.value, 'important');
