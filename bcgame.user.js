@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BC.GAME Design — Minimal Header v2.1
 // @namespace    https://github.com/blatokomitet/bcgame-design
-// @version      0.3.3
+// @version      0.3.4
 // @description  Minimal Header: compact balance, gift overflow, 360px logo-fit guard
 // @match        https://bcgame.st/*
 // @match        https://*.bcgame.st/*
@@ -20,6 +20,7 @@
   let attempts = 0;
   let timer = null;
   let active = null;
+  let logoFit = { state: 'not-checked' };
 
   function activate() {
     const header = document.querySelector('.page-header');
@@ -136,19 +137,49 @@
           set(image, 'object-fit', 'contain');
           set(container, 'flex', '0 0 ' + rightWidth + 'px');
 
-          const l = logo.getBoundingClientRect();
-          const i = image.getBoundingClientRect();
-          const b = balance.getBoundingClientRect();
-          const a = avatar.getBoundingClientRect();
-          const fit = l.width >= 34 && i.width >= 34 &&
-            b.left >= l.right + 1 && a.right <= window.innerWidth - 1 &&
-            b.width >= 165;
-          if (!fit) {
+          const measure = () => {
+            const l = logo.getBoundingClientRect();
+            const g = logoGroup.getBoundingClientRect();
+            const i = image.getBoundingClientRect();
+            const b = balance.getBoundingClientRect();
+            const d = deposit.getBoundingClientRect();
+            const a = avatar.getBoundingClientRect();
+            return {
+              logoWidth: Math.round(l.width),
+              imageWidth: Math.round(i.width),
+              imageHeight: Math.round(i.height),
+              gap: Math.round((b.left - l.right) * 10) / 10,
+              balanceWidth: Math.round(b.width),
+              avatarRight: Math.round(a.right),
+              ok: g.width >= 34 && l.width >= 34 &&
+                i.width >= 28 && i.height >= 28 &&
+                b.left >= l.right - 0.5 &&
+                b.width >= 165 && a.right <= window.innerWidth + 1 &&
+                d.left >= b.left - 1 && d.right <= b.right + 1
+            };
+          };
+          // The BC.GAME image is an original rem-based asset (often 30px
+          // at this viewport). Its flex box must be 35px, but the image
+          // need only render legibly, not necessarily at exactly 35px.
+          // Requiring a 35px image caused valid layouts to roll back.
+          let check = measure();
+          if (!check.ok) {
+            // Preserve wallet and button sizes; reclaim only inter-button
+            // whitespace as a fallback on particularly narrow layouts.
+            set(row, 'column-gap', '0px');
+            set(container, 'column-gap', '3px');
+            check = measure();
+          }
+          if (!check.ok) {
             for (const [el, prop, value, priority] of saved.splice(checkpoint).reverse()) {
               if (value) el.style.setProperty(prop, value, priority);
               else el.style.removeProperty(prop);
             }
-            console.warn('[BC Header v2.1] compact logo fit unavailable; preserved original layout');
+            logoFit = { state: 'ROLLED_BACK', ...check };
+            console.warn('[BC Header v2.1] compact logo fit unavailable', logoFit);
+          } else {
+            logoFit = { state: 'FITTED', ...check };
+            console.info('[BC Header v2.1] compact logo fitted', logoFit);
           }
         }
       }
@@ -172,7 +203,7 @@
       };
       document.addEventListener('click',onOutside);
       active = { header, restore };
-      console.info('[BC Header v2.1] ACTIVE', {scriptVersion:'0.3.3',logoWidth:Math.round(logo.getBoundingClientRect().width),balanceX:Math.round(rb.x),balanceWidth:Math.round(rb.width),depositX:Math.round(rd.x)});
+      console.info('[BC Header v2.1] ACTIVE', {scriptVersion:'0.3.4',logoWidth:Math.round(logo.getBoundingClientRect().width),balanceX:Math.round(rb.x),balanceWidth:Math.round(rb.width),depositX:Math.round(rd.x)});
       return true;
     } catch (e) {
       restore();
@@ -187,7 +218,7 @@
     return activate();
   };
   window[STATE] = {
-    status: () => ({ installed:true, version:'0.3.3', active:!!active, attempts }),
+    status: () => ({ installed:true, version:'0.3.4', active:!!active, attempts, logoFit }),
     restore: () => { if (timer) clearInterval(timer); active?.restore(); delete window[STATE]; }
   };
   if (!start()) {
