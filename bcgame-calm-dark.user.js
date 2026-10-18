@@ -78,6 +78,9 @@
         el.style.getPropertyPriority(prop) !== 'important') {
       el.style.setProperty(prop, value, 'important');
     }
+    // CSS normalizes gradients, shadows and colors when serializing them.
+    // Store the normalized value to avoid mutation-observer feedback loops.
+    props.get(prop).value = el.style.getPropertyValue(prop);
   }
 
   function resetOverrides(el, props) {
@@ -139,6 +142,8 @@
     // independent scale/translate properties to size/align this dock.
     override(bar, 'position', 'fixed');
     override(bar, 'top', 'auto');
+    override(bar, 'bottom', getComputedStyle(bar).bottom);
+    override(bar, 'left', getComputedStyle(bar).left);
     override(bar, 'transform', beforeTransform === 'none' ? 'none' : beforeTransform);
     override(bar, 'transform-origin', 'center bottom');
     override(bar, 'transition', 'none');
@@ -183,7 +188,7 @@
       const rules = OVERRIDES.get(bar);
       if (!bar.isConnected || !rules || disposed) return;
       for (const [prop, entry] of rules) {
-        if (['position','top','transform','transform-origin','scale',
+        if (['position','top','bottom','left','transform','transform-origin','scale',
              'translate','transition','animation','background-color',
              'background-image','box-shadow'].includes(prop)) {
           if (bar.style.getPropertyValue(prop) !== entry.value ||
