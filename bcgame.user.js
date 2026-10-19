@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         BC.GAME Design — Minimal Header v2.1
 // @namespace    https://github.com/blatokomitet/bcgame-design
-// @version      0.3.7
-// @description  Minimal Header: compact balance, gift overflow, 360px logo-fit guard
+// @version      0.3.8
+// @description  Mobile compact flex header with full-sized brand and aligned controls
 // @match        https://bcgame.st/*
 // @match        https://*.bcgame.st/*
 // @match        https://bc.game/*
@@ -95,116 +95,121 @@
       set(bell,'height','38px');
       set(avatar,'width','42px');
       set(avatar,'height','42px');
-      // Prefer a regular flex adjustment, without translating the deposit button.
-      // Preserve the live layout if the device has less room.
-      const before = balance.getBoundingClientRect();
-      if (window.innerWidth >= 390 && before.width <= 205) {
-        set(balance,'transform','none');
-        set(balance,'width','222px');
-        set(balance,'max-width','222px');
-        set(balance,'flex','0 0 222px');
-        set(balance,'margin-left','-22px');
-      }
-      // The mobile 360px header has two flex groups: the 18px logo box
-      // and a 304px controls group. Growing the logo flex item to 35px
-      // forces the controls to overlap. Instead, preserve the existing
-      // group widths and move their *visual* boxes into the spare 17px:
-      // about 8px to the left for the logo, 9px right for the controls.
-      // Derived from the successful Eruda geometry test on 360px.
-      if (window.innerWidth >= 360 && window.innerWidth < 390) {
+      // Compact, balanced header for mobile screens. The previous
+      // 390px+ breakpoint forced the wallet to 222px and -22px margin,
+      // leaving the BC.GAME logo compressed to approximately 18px.
+      // Keep the logo and wallet in the flex layout, never move them
+      // outside their hit-test boxes using relative positioning.
+      const viewport = document.documentElement.clientWidth;
+      if (viewport >= 360 && viewport <= 430) {
         const logoBox = logo.parentElement;
         const image = logo.querySelector('img');
         const row = logoBox?.parentElement;
+
         if (logoBox && image && row?.contains(container)) {
           const checkpoint = saved.length;
-          const logoBefore = logo.getBoundingClientRect();
-          const boxWidth = logoBox.getBoundingClientRect().width;
-          const balanceBefore = balance.getBoundingClientRect();
-          const viewport = document.documentElement.clientWidth;
+          const walletWidth = Math.min(207, Math.max(174,
+            Math.round(174 + (viewport - 360) * 0.45)
+          ));
 
-          set(logoBox, 'flex', '0 0 ' + boxWidth + 'px');
-          set(logoBox, 'width', boxWidth + 'px');
-          set(logoBox, 'min-width', boxWidth + 'px');
-          set(logoBox, 'max-width', boxWidth + 'px');
+          // Reclaim the unused side padding while preserving margins.
+          set(row, 'padding-left', '3px');
+          set(row, 'padding-right', '3px');
+          set(row, 'justify-content', 'space-between');
+          set(row, 'column-gap', '6px');
+          set(row, 'align-items', 'center');
 
+          set(logoBox, 'flex', '0 0 35px');
+          set(logoBox, 'width', '35px');
+          set(logoBox, 'min-width', '35px');
+          set(logoBox, 'max-width', '35px');
+          set(logoBox, 'overflow', 'visible');
+          set(logo, 'display', 'block');
           set(logo, 'flex', '0 0 35px');
           set(logo, 'width', '35px');
           set(logo, 'min-width', '35px');
-          set(logo, 'flex-shrink', '0');
-
+          set(logo, 'max-width', '35px');
+          set(logo, 'position', 'static');
+          set(logo, 'margin', '0px');
+          set(image, 'display', 'block');
           set(image, 'width', '35px');
-          set(image, 'height', '30px');
+          set(image, 'height', '35px');
           set(image, 'max-width', 'none');
           set(image, 'object-fit', 'contain');
 
-          const enlarged = logo.getBoundingClientRect();
-          const balRect = balance.getBoundingClientRect();
-          const avatarRect = avatar.getBoundingClientRect();
-          // A fixed 4px gap was 2-3px too wide on the actual 360px
-          // viewport. Derive an attainable positive gap from *both*
-          // edge margins, then never move farther than those margins.
-          const minLogoLeft = 7;
-          const minAvatarRightMargin = 8;
-          const freeLeft = Math.max(0, enlarged.left - minLogoLeft);
-          const freeRight = Math.max(
-            0, viewport - minAvatarRightMargin - avatarRect.right
-          );
-          const currentGap = balRect.left - enlarged.right;
-          const maxGap = currentGap + freeLeft + freeRight;
-          // Keep half a pixel of tolerance for fractional CSS pixels.
-          const targetGap = Math.min(4, maxGap - 0.5);
-          const possible = targetGap >= 1;
-          const required = possible
-            ? Math.max(0, targetGap - currentGap) : 0;
-          const moveRight = Math.min(required, freeRight);
-          const moveLeft = required - moveRight;
+          set(container, 'display', 'flex');
+          set(container, 'align-items', 'center');
+          set(container, 'justify-content', 'flex-start');
+          set(container, 'column-gap', '4px');
+          set(container, 'flex', '0 0 auto');
+          set(container, 'width', 'auto');
+          set(container, 'position', 'static');
+          set(container, 'margin-left', '0px');
+          set(container, 'margin-right', '0px');
 
-          if (possible && moveLeft <= freeLeft + 0.01) {
-            set(logo, 'position', 'relative');
-            set(logo, 'left', -moveLeft + 'px');
-            set(container, 'position', 'relative');
-            set(container, 'left', moveRight + 'px');
-          }
+          set(balance, 'width', walletWidth + 'px');
+          set(balance, 'min-width', walletWidth + 'px');
+          set(balance, 'max-width', walletWidth + 'px');
+          set(balance, 'flex', '0 0 ' + walletWidth + 'px');
+          set(balance, 'margin-left', '0px');
+          set(balance, 'margin-right', '0px');
+          set(balance, 'transform', 'none');
+          set(balance, 'height', '36px');
+          set(balance, 'box-sizing', 'border-box');
+          set(balance, 'border-width', '1px');
+
+          set(bell, 'width', '34px');
+          set(bell, 'min-width', '34px');
+          set(bell, 'height', '36px');
+          set(bell, 'flex', '0 0 34px');
+
+          set(menu, 'width', '34px');
+          set(menu, 'min-width', '34px');
+          set(menu, 'height', '36px');
+          set(menu, 'flex', '0 0 34px');
+
+          set(avatar, 'width', '42px');
+          set(avatar, 'height', '42px');
+          set(avatar, 'flex', '0 0 42px');
 
           const l = logo.getBoundingClientRect();
           const i = image.getBoundingClientRect();
-          const b = balance.getBoundingClientRect();
+          const w = balance.getBoundingClientRect();
           const d = deposit.getBoundingClientRect();
           const n = bell.getBoundingClientRect();
           const m = menu.getBoundingClientRect();
-          const av = avatar.getBoundingClientRect();
-          const gap = b.left - l.right;
+          const a = avatar.getBoundingClientRect();
+          const group = container.getBoundingClientRect();
+          const gap = w.left - l.right;
 
-          const ok = l.width >= 34 && i.width >= 28 && i.height >= 28 &&
-            l.left >= 7 && gap >= 0.9 && av.right <= viewport - 7 &&
-            Math.abs(b.width - balanceBefore.width) <= 1 &&
-            d.left >= b.left - 1 && d.right <= b.right + 1 &&
+          const ok = l.width >= 34 && i.width >= 28 &&
+            l.left >= 5 && gap >= 3 &&
+            w.width >= 170 && a.right <= viewport - 4 &&
+            d.left >= w.left - 1 && d.right <= w.right + 1 &&
             d.right <= n.left + 1 && n.right <= m.left + 1 &&
-            m.right <= av.left + 1;
+            m.right <= a.left + 1 && group.right <= viewport - 4;
 
           logoFit = {
             state: ok ? 'FITTED' : 'ROLLED_BACK',
-            logoBefore: Math.round(logoBefore.width),
+            layout: 'compact-flex',
             logoWidth: Math.round(l.width),
             imageWidth: Math.round(i.width),
+            walletWidth: Math.round(w.width),
+            groupWidth: Math.round(group.width),
             gap: Math.round(gap * 10) / 10,
-            targetGap: Math.round(targetGap * 10) / 10,
-            maxGap: Math.round(maxGap * 10) / 10,
-            logoLeft: Math.round(l.left * 10) / 10,
-            balanceWidth: Math.round(b.width),
-            avatarRight: Math.round(av.right),
-            moveLeft: Math.round(moveLeft),
-            moveRight: Math.round(moveRight),
+            avatarRight: Math.round(a.right),
+            viewport,
             ok
           };
+
           if (!ok) {
             for (const [el, prop, value, priority] of saved.splice(checkpoint).reverse()) {
               if (value) el.style.setProperty(prop, value, priority);
               else el.style.removeProperty(prop);
             }
-            console.warn('[BC Header v2.1] logo layout kept original', logoFit);
+            console.warn('[BC Header v2.1] compact fit rejected', logoFit);
           } else {
-            console.info('[BC Header v2.1] logo fitted', logoFit);
+            console.info('[BC Header v2.1] compact fit active', logoFit);
           }
         }
       }
@@ -228,7 +233,7 @@
       };
       document.addEventListener('click',onOutside);
       active = { header, restore };
-      console.info('[BC Header v2.1] ACTIVE', {scriptVersion:'0.3.7',logoWidth:Math.round(logo.getBoundingClientRect().width),balanceX:Math.round(rb.x),balanceWidth:Math.round(rb.width),depositX:Math.round(rd.x)});
+      console.info('[BC Header v2.1] ACTIVE', {scriptVersion:'0.3.8',logoWidth:Math.round(logo.getBoundingClientRect().width),balanceX:Math.round(rb.x),balanceWidth:Math.round(rb.width),depositX:Math.round(rd.x)});
       return true;
     } catch (e) {
       restore();
@@ -243,7 +248,7 @@
     return activate();
   };
   window[STATE] = {
-    status: () => ({ installed:true, version:'0.3.7', active:!!active, attempts, logoFit }),
+    status: () => ({ installed:true, version:'0.3.8', active:!!active, attempts, logoFit }),
     restore: () => { if (timer) clearInterval(timer); active?.restore(); delete window[STATE]; }
   };
   if (!start()) {
