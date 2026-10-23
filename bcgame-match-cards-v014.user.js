@@ -170,7 +170,7 @@
     for(const st of styles)st.remove();styles.clear();
     delete window[KEY];return {status:'disabled'};
   }
-  const api={refresh,audit:refresh,disable,inspect:()=>{const r=roots().find(root=>root.querySelector('[data-editor-id="eventCard"]'));const card=r?.querySelector('[data-editor-id="eventCard"]');const shell=card?.querySelector('.bc-m-shell');const cat=card?.querySelector('[data-editor-id="eventCardCategory"]');return {card:card&&{height:card.getBoundingClientRect().height,computedHeight:getComputedStyle(card).height,html:card.outerHTML.slice(0,600)},shell:shell&&{height:shell.getBoundingClientRect().height,computedHeight:getComputedStyle(shell).height},category:cat?.outerHTML.slice(0,1200),parent:card?.parentElement&&{class:card.parentElement.className,height:card.parentElement.getBoundingClientRect().height}};}};window[KEY]=api;
+  const api={refresh,audit:()=>({version:'2.0.0',...refresh(),visibleEvents:[...feeds.values()].reduce((n,v)=>n+v.el.querySelectorAll('.bc2-event').length,0),visibleGroups:[...feeds.values()].reduce((n,v)=>n+v.el.querySelectorAll('.bc2-group').length,0)}),disable};window[KEY]=api;
   timer=setInterval(refresh,1800);
-  console.info('[BC.GAME Match Cards v0.1.6]',refresh());
+  console.info('[BC.GAME Match Cards v2.0]',refresh());
 })();
