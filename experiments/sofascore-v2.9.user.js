@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BC.GAME Sofascore Compact v2.9 — Compact
 // @namespace    https://github.com/blatokomitet/bcgame-design
-// @version      2.9.1
+// @version      2.9.2
 // @description  Published consolidated console design: red time, white score, 1px green divider
 // @match        https://bcgame.st/ru/sports/*
 // @match        https://*.bcgame.st/ru/sports/*
@@ -19,7 +19,7 @@
   const observers=new Map();
   let active=true, queued=false;
   function timeValue(s) {
-    const minute=s.match(/\d{1,3}\s*[′']/);
+    const minute=s.match(/\b\d{1,3}(?:\s*\+\s*\d{1,2})?\s*[′'](?:\s*\+\s*\d{1,2})?/);
     if(minute)return minute[0].replace(/\s+/g,'');
     if(/перерыв|half.?time/i.test(s))return 'HT';
     const clock=s.match(/\b\d{1,2}:\d{2}\b/);
@@ -70,3 +70,4 @@
   else start();
   console.info('[BC Sofa v2.9] Consolidated layout loaded');
 })();
+

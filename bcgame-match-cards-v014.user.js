@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         BC.GAME Match Cards — Shadow DOM v2.5
+// @name         BC.GAME Match Cards — Stable DOM
 // @namespace    https://github.com/blatokomitet/bcgame-design
-// @version      2.5.0
-// @description  Beta: match cards using original BC.GAME data, logos, links and live scores. No popups.
+// @version      2.6.0
+// @description  Soccer cards with reversible updates, safe fallback and stable match elements.
 // @match        https://bcgame.st/*
 // @match        https://*.bcgame.st/*
 // @match        https://bc.game/*
@@ -12,246 +12,253 @@
 // ==/UserScript==
 (() => {
   'use strict';
-  if (window.__bcMatchCardsV014) return;
   const KEY = '__bcMatchCardsV014';
+  if (window[KEY]) return;
   const STYLE_ID = 'bc-match-v014-css';
-  const owned = new Set();
-  const styles = new Set();
-  let stopped = false;
-  let timer;
-  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const norm = s => String(s ?? '').replace(/\s+/g,' ').trim();
-  const leafText = node => [...node.querySelectorAll('*')].filter(e => !e.children.length && norm(e.textContent)).map(e=>norm(e.textContent));
-  const roots = () => {
-    const out = [document];
-    for (let i=0;i<out.length;i++) {
-      for (const n of out[i].querySelectorAll('*')) if(n.shadowRoot && !out.includes(n.shadowRoot))out.push(n.shadowRoot);
-    }
-    return out;
-  };
+  const CARD = '[data-editor-id="eventCard"]';
+  const OWN = '.bc2-feed,[data-bc-match-style]';
+  const feeds = new Map();
+  const roots = new Map();
+  const hidden = new Set();
+  const timers = new Set();
+  let stopped = false, pending = null, discoveryTimer = null, failures = 0;
+  const norm = value => String(value ?? '').replace(/\s+/g, ' ').trim();
   const css = `
-[data-editor-id="eventCard"].bc-m-v014{display:none!important}
-.bc2-feed{display:flex!important;flex-direction:column!important;gap:12px!important;margin:12px 0 20px!important;width:100%!important;box-sizing:border-box!important}
-.bc2-group{border-radius:22px!important;background:#1b2023!important;border:1px solid #2c3537!important;overflow:hidden!important;color:#f3f5f5!important}
-.bc2-head{display:flex!important;gap:12px!important;align-items:center!important;padding:17px 15px 12px!important}
-.bc2-logo{width:38px!important;height:38px!important;flex:0 0 38px!important;display:grid!important;place-items:center!important}
-.bc2-logo img,.bc2-logo svg{width:36px!important;height:36px!important;object-fit:contain!important}
-.bc2-title{font-size:16px!important;font-weight:700!important;line-height:1.3!important;color:#fff!important}
-.bc2-country{font-size:12px!important;color:#9ca7a9!important;margin-top:4px!important}
-.bc2-event{display:grid!important;grid-template-columns:53px minmax(0,1fr) 25px 35px!important;gap:8px!important;align-items:center!important;padding:12px 13px 13px!important;box-sizing:border-box!important;text-decoration:none!important;color:inherit!important}
-.bc2-event+.bc2-event{border-top:1px solid #343c3e!important}
-.bc2-time,.bc2-teams,.bc2-scores{display:flex!important;flex-direction:column!important;justify-content:center!important;gap:13px!important;min-width:0!important}
-.bc2-minute{font-size:14px!important;font-weight:700!important;color:#ff5966!important;white-space:nowrap!important}
-.bc2-minute.live:before{content:''!important;width:6px!important;height:6px!important;margin:0 5px 2px 0!important;display:inline-block!important;border-radius:50%!important;background:#ff5966!important;animation:bc2pulse 1.7s infinite!important}
-.bc2-period{color:#9eaaac!important;font-size:11px!important;line-height:1.2!important}
-.bc2-team{display:flex!important;gap:8px!important;align-items:center!important;min-height:28px!important;min-width:0!important}
-.bc2-teamlogo{display:grid!important;place-items:center!important;flex:0 0 26px!important;width:26px!important;height:26px!important}
-.bc2-teamlogo img,.bc2-teamlogo svg{width:26px!important;height:26px!important;object-fit:contain!important}
-.bc2-name{font-size:14px!important;font-weight:600!important;line-height:1.3!important;color:#f0f3f3!important;overflow-wrap:anywhere!important}
-.bc2-scores{align-items:center!important}
-.bc2-score{font-size:21px!important;line-height:28px!important;color:#fc5966!important;font-weight:800!important}
-.bc2-bell{width:32px!important;height:32px!important;border:1px solid #425154!important;border-radius:50%!important;display:grid!important;place-items:center!important;pointer-events:none!important}
-.bc2-bell svg{width:18px!important;height:18px!important;stroke:#a5b0b2!important;fill:none!important;stroke-width:1.7!important}
-
-/* Compact layout: counter inherited BC.GAME styles from the original card system */
-.bc2-feed .bc2-group{height:auto!important;min-height:0!important;max-height:none!important;padding:0!important;display:block!important}
-.bc2-feed .bc2-head{height:auto!important;min-height:0!important;max-height:none!important;margin:0!important;padding:12px 14px 9px!important;display:flex!important;align-items:center!important}
-.bc2-feed .bc2-logo{height:33px!important;width:33px!important;flex:0 0 33px!important}
-.bc2-feed .bc2-logo img,.bc2-feed .bc2-logo svg{height:30px!important;width:30px!important}
-.bc2-feed .bc2-event{height:auto!important;min-height:80px!important;max-height:none!important;margin:0!important;padding:8px 12px 12px!important;display:grid!important;grid-template-columns:48px minmax(0,1fr) 27px 34px!important;gap:8px!important;align-items:center!important;line-height:normal!important}
-.bc2-feed .bc2-time,.bc2-feed .bc2-teams,.bc2-feed .bc2-scores{height:auto!important;min-height:0!important;margin:0!important;padding:0!important;gap:8px!important}
-.bc2-feed .bc2-team{height:auto!important;min-height:28px!important;max-height:none!important;margin:0!important;padding:0!important;gap:8px!important}
-.bc2-feed .bc2-name{font-size:15px!important;line-height:1.25!important}
-.bc2-feed .bc2-score{font-size:23px!important;line-height:28px!important}
-.bc2-feed .bc2-minute{font-size:13px!important}
-.bc2-feed .bc2-period{font-size:11px!important}
-.bc2-feed .bc2-bell{height:32px!important;width:32px!important}
-
-/* Independent layout: prevent global styled-components rules from stretching groups. */
-.bc2-feed{display:flex!important;flex-direction:column!important;align-items:stretch!important;justify-content:flex-start!important;height:auto!important;min-height:0!important}
-.bc2-feed > .bc2-group{display:flex!important;flex-direction:column!important;align-items:stretch!important;justify-content:flex-start!important;align-content:initial!important;box-sizing:border-box!important;position:relative!important;height:auto!important;min-height:0!important;max-height:none!important;margin:0!important;padding:0!important;gap:0!important;flex:none!important}
-.bc2-feed .bc2-group > .bc2-head{display:flex!important;position:relative!important;flex:0 0 auto!important;height:auto!important;min-height:0!important;max-height:none!important;box-sizing:border-box!important;padding:13px 14px 8px!important;margin:0!important;justify-content:flex-start!important;align-self:stretch!important}
-.bc2-feed .bc2-group > .bc2-event{display:grid!important;position:relative!important;flex:none!important;align-self:stretch!important;box-sizing:border-box!important;height:auto!important;min-height:0!important;max-height:none!important;padding:8px 12px 14px!important;margin:0!important;grid-template-columns:49px minmax(0,1fr) 27px 34px!important;grid-template-rows:auto!important;align-content:center!important;align-items:center!important;justify-content:normal!important;gap:8px!important}
-.bc2-feed .bc2-event > .bc2-time,.bc2-feed .bc2-event > .bc2-teams,.bc2-feed .bc2-event > .bc2-scores{display:flex!important;position:relative!important;height:auto!important;min-height:0!important;max-height:none!important;padding:0!important;margin:0!important;gap:8px!important;align-self:center!important;justify-content:center!important}
-.bc2-feed .bc2-event .bc2-team{height:auto!important;min-height:28px!important;max-height:none!important}
-.bc2-feed .bc2-event .bc2-name{font-size:14px!important;line-height:1.25!important;overflow-wrap:anywhere!important}
-.bc2-feed .bc2-event .bc2-score{font-size:22px!important;line-height:28px!important}
-
-/* v2.4 visual polish — preserve v2.3 card geometry */
-.bc2-feed{gap:9px!important;margin-top:9px!important}
-.bc2-feed>.bc2-group{border-color:#303b3d!important;box-shadow:0 3px 12px rgba(0,0,0,.10)!important}
-.bc2-feed .bc2-group>.bc2-head{padding-bottom:7px!important}
-.bc2-feed .bc2-event>.bc2-scores{gap:8px!important}
-.bc2-feed .bc2-event .bc2-score{font-size:25px!important;font-weight:800!important;line-height:29px!important;color:#ff5867!important;font-variant-numeric:tabular-nums!important}
-.bc2-feed .bc2-event .bc2-name{font-size:14px!important;letter-spacing:-.15px!important;line-height:1.25!important;overflow-wrap:anywhere!important}
-.bc2-feed .bc2-event{grid-template-columns:49px minmax(0,1fr) 28px 33px!important;gap:8px!important}
-.bc2-feed .bc2-logo img{object-fit:contain!important}
-.bc2-feed .bc2-bell{width:31px!important;height:31px!important;opacity:.88!important}
-
-/* Eruda-verified HTML v3.1 composition, no-flicker, compact spacing and prematch text */
-.bc2-feed{gap:16px!important;margin:12px 0 24px!important}
-.bc2-feed>.bc2-group{border-radius:26px!important;padding:14px 14px 12px!important;box-shadow:none!important;animation:none!important;transition:none!important;transform:none!important;opacity:1!important}
-.bc2-feed .bc2-group>.bc2-head{display:grid!important;grid-template-columns:48px minmax(0,1fr)!important;gap:13px!important;align-items:center!important;margin:0 0 8px!important;padding:0!important;height:auto!important;min-height:0!important;max-height:none!important;animation:none!important;transition:none!important}
-.bc2-feed .bc2-logo{width:46px!important;height:46px!important;min-width:46px!important;flex:none!important}
-.bc2-feed .bc2-logo img,.bc2-feed .bc2-logo svg{width:44px!important;height:44px!important}
-.bc2-feed .bc2-title{font-size:17px!important;line-height:1.2!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
-.bc2-feed .bc2-country{font-size:13px!important;margin-top:5px!important}
-.bc2-feed .bc2-group>.bc2-event{display:grid!important;grid-template-columns:72px minmax(0,1fr) 28px 40px!important;grid-template-rows:auto!important;gap:7px!important;align-items:center!important;align-content:center!important;min-height:76px!important;height:auto!important;max-height:none!important;margin:0!important;padding:0!important;animation:none!important;transition:none!important;transform:none!important;opacity:1!important}
-.bc2-feed .bc2-group>.bc2-event+.bc2-event{margin-top:13px!important;padding-top:13px!important;border-top:1px solid #353d40!important}
-.bc2-feed .bc2-time{display:grid!important;gap:9px!important;justify-content:center!important;align-content:center!important;text-align:center!important;min-width:0!important;max-width:100%!important;overflow:hidden!important}
-.bc2-feed .bc2-minute{display:block!important;font-size:15px!important;line-height:1.2!important;font-weight:700!important;max-width:100%!important;box-sizing:border-box!important}
-.bc2-feed .bc2-minute:not(.live){white-space:normal!important;overflow-wrap:normal!important;word-break:normal!important;text-align:center!important;font-size:11px!important;line-height:1.3!important;color:#99a5a8!important}
-.bc2-feed .bc2-minute.live{white-space:nowrap!important;color:#ff5966!important}
-.bc2-feed .bc2-period{font-size:12px!important;line-height:1.3!important;text-align:center!important}
-.bc2-feed .bc2-teams{display:grid!important;gap:9px!important;min-width:0!important;align-content:center!important}
-.bc2-feed .bc2-team{display:flex!important;align-items:center!important;gap:10px!important;height:27px!important;min-height:27px!important;max-height:27px!important;min-width:0!important}
-.bc2-feed .bc2-teamlogo{width:24px!important;height:27px!important;flex:0 0 24px!important}
-.bc2-feed .bc2-teamlogo img,.bc2-feed .bc2-teamlogo svg{width:24px!important;height:24px!important}
+${CARD}.bc-m-v014{display:none!important}
+.bc2-feed{display:flex!important;flex-direction:column!important;gap:16px!important;width:100%!important;margin:12px 0 24px!important;box-sizing:border-box!important;grid-column:1/-1!important}
+.bc2-feed .bc2-group{display:block!important;box-sizing:border-box!important;margin:0!important;padding:14px!important;height:auto!important;min-height:0!important;border:1px solid #303b3d!important;border-radius:26px!important;background:#1b2023!important;color:#f3f5f5!important}
+.bc2-feed .bc2-head{display:grid!important;grid-template-columns:44px minmax(0,1fr)!important;gap:13px!important;align-items:center!important;margin:0 0 8px!important;padding:0!important}
+.bc2-feed .bc2-logo{width:44px!important;height:44px!important;display:grid!important;place-items:center!important;color:#9ca7a9!important;font-size:20px!important}
+.bc2-feed .bc2-logo img{width:44px!important;height:44px!important;object-fit:contain!important}
+.bc2-feed .bc2-title{font-size:17px!important;font-weight:700!important;line-height:1.2!important;overflow-wrap:anywhere!important}
+.bc2-feed .bc2-country{font-size:13px!important;color:#9ca7a9!important;margin-top:5px!important}
+.bc2-feed .bc2-event{display:grid!important;grid-template-columns:65px minmax(0,1fr) 32px!important;gap:10px!important;align-items:center!important;box-sizing:border-box!important;position:relative!important;min-height:76px!important;height:auto!important;margin:0!important;padding:8px 0!important;color:inherit!important;text-decoration:none!important;border-radius:8px!important}
+.bc2-feed .bc2-event+.bc2-event{border-top:1px solid #353d40!important}
+.bc2-feed .bc2-event:focus-visible{outline:2px solid #11e58d!important;outline-offset:3px!important}
+.bc2-feed .bc2-time{display:grid!important;gap:8px!important;min-width:0!important;text-align:center!important}
+.bc2-feed .bc2-minute{font-size:12px!important;line-height:1.3!important;color:#aeb9bc!important;overflow-wrap:anywhere!important}
+.bc2-feed .bc2-minute.live{font-size:15px!important;font-weight:700!important;color:#ff5966!important}
+.bc2-feed .bc2-period{font-size:12px!important;color:#aeb9bc!important}
+.bc2-feed .bc2-teams,.bc2-feed .bc2-scores{display:grid!important;gap:9px!important;min-width:0!important}
+.bc2-feed .bc2-team{display:flex!important;align-items:center!important;gap:10px!important;min-width:0!important;height:27px!important}
+.bc2-feed .bc2-teamlogo{display:grid!important;place-items:center!important;width:24px!important;height:24px!important;flex:0 0 24px!important;font-size:13px!important;color:#aeb9bc!important}
+.bc2-feed .bc2-teamlogo img{width:24px!important;height:24px!important;object-fit:contain!important}
 .bc2-feed .bc2-name{font-size:16px!important;font-weight:550!important;line-height:1.25!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;min-width:0!important}
-.bc2-feed .bc2-scores{display:grid!important;gap:9px!important;align-content:center!important;justify-items:center!important}
-.bc2-feed .bc2-score{font-size:22px!important;font-weight:750!important;line-height:27px!important;color:#ff5966!important;font-variant-numeric:tabular-nums!important}
-.bc2-feed .bc2-bell{width:39px!important;height:39px!important;border-radius:50%!important;justify-self:center!important;align-self:center!important}
-.bc2-feed .bc2-bell svg{width:21px!important;height:21px!important}
-@keyframes bcGoalGreenV25{0%{transform:scale(1);color:#ff5966}20%,65%{transform:scale(1.4);color:#11e58d}100%{transform:scale(1);color:#ff5966}}
-.bc2-feed .bc2-score.bc-goal-flash{animation:bcGoalGreenV25 1.2s ease-out 1!important}
-@media(max-width:350px){.bc2-feed .bc2-group>.bc2-event{grid-template-columns:60px minmax(0,1fr) 24px 35px!important;gap:5px!important}.bc2-feed .bc2-name{font-size:14px!important}}
+.bc2-feed .bc2-score{font-size:22px!important;font-weight:750!important;line-height:27px!important;text-align:center!important;color:#ff5966!important;font-variant-numeric:tabular-nums!important}
+.bc2-feed .bc2-score.bc-goal-flash{animation:bcGoalGreen 1.2s ease-out!important}
+@keyframes bcGoalGreen{20%,65%{transform:scale(1.3);color:#11e58d}}
+@media(max-width:350px){.bc2-feed .bc2-event{grid-template-columns:56px minmax(0,1fr) 28px!important;gap:7px!important}.bc2-feed .bc2-name{font-size:14px!important}}
 @media(prefers-reduced-motion:reduce){.bc2-feed .bc2-score.bc-goal-flash{animation:none!important;color:#11e58d!important}}
-@keyframes bc2pulse{50%{opacity:.3;transform:scale(.75)}}@media(prefers-reduced-motion:reduce){.bc2-minute.live:before{animation:none!important}}
 `;
-  const bell = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 6-3 7-3 9h18c0-2-3-3-3-9M10 21h4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  function directLeaves(node) {
-    return [...node.querySelectorAll('*')].filter(e => e.childElementCount===0 && norm(e.textContent));
+  function safeURL(value, match = false) {
+    if (!value) return '';
+    try {
+      const url = new URL(value, document.baseURI);
+      if (!['http:', 'https:'].includes(url.protocol)) return '';
+      if (match && (url.origin !== location.origin || !/\/sports\/soccer\//.test(url.pathname))) return '';
+      return url.href;
+    } catch { return ''; }
   }
-  function getTeams(link){
-    const group=link.querySelector('[class*="sc-1gh6pgx-1"]');
-    if(!group)return [];
-    return [...group.children].filter(e=>e.matches('[class*="sc-1gh6pgx-2"]')).slice(0,2).map(row=>{
-      const nameNode=row.querySelector('.jss39')||row.querySelector('[class*="sc-1gh6pgx-3"] .jss39')||directLeaves(row).find(e=>!/^\d+$/.test(norm(e.textContent)));
-      const logo=row.querySelector('img,[data-editor-id="fallbackCompetitorIcon"]');
-      return {name:norm(nameNode?.textContent),logo:logo?.outerHTML||''};
+  function status(value) {
+    const text = norm(value);
+    const minute = text.match(/^(\d{1,3}(?:\s*\+\s*\d{1,2})?\s*[′'](?:\s*\+\s*\d{1,2})?)(.*)$/);
+    return { text: minute ? minute[1].replace(/\s+/g, '') : text,
+      phase: minute ? norm(minute[2]) : '', live: !!minute };
+  }
+  function imageURL(node) {
+    const img = node?.querySelector('img');
+    return safeURL(img?.currentSrc || img?.getAttribute('src'));
+  }
+  function extract(card) {
+    const link = card.querySelector('a[data-editor-id="eventCardContent"][href]');
+    const category = card.querySelector('[data-editor-id="eventCardCategory"]');
+    const href = safeURL(link?.getAttribute('href'), true);
+    if (!link || !category || !href) return null;
+    const group = link.querySelector('[class*="sc-1gh6pgx-1"]');
+    if (!group) return null;
+    const rows = [...group.children].filter(e => e.matches('[class*="sc-1gh6pgx-2"]'));
+    if (rows.length !== 2) return null;
+    const teams = rows.map(row => {
+      const name = row.querySelector('[data-editor-id="competitorName"],.jss39,.jss52') ||
+        [...row.querySelectorAll('*')].find(e => !e.children.length && norm(e.textContent) && !/^\d+$/.test(norm(e.textContent)));
+      return { name: norm(name?.textContent), logo: imageURL(row) };
     });
-  }
-  function getScores(link){
-    const area=link.querySelector('[class*="sc-1gh6pgx-0"]');
-    if(!area)return null;
-    // Ignore team labels: score nodes are numeric leaves outside the team-name column.
-    const nums=directLeaves(area).filter(e=>/^\d{1,2}$/.test(norm(e.textContent)) && !e.closest('[class*="sc-1gh6pgx-1"]')).map(e=>norm(e.textContent));
-    return nums.length>=2 ? nums.slice(0,2) : null;
-  }
-  function getLeague(card){
-    const cat=card.querySelector('[data-editor-id="eventCardCategory"]');
-    if(!cat)return null;
-    const texts=[...new Set([...(function(){const arr=[];const walker=document.createTreeWalker(cat,NodeFilter.SHOW_TEXT);let t;while(t=walker.nextNode()){const v=norm(t.nodeValue);if(v)arr.push(v);}return arr;})()])].filter(Boolean);
-    const icon=cat.querySelector('img,svg');
-    const country=texts.length>1?texts[0]:'';
-    const league=texts.slice(1).find(s=>s!==country)||(texts.length===1?texts[0]:'');
-    return {country,league,icon:icon?.outerHTML||''};
-  }
-  function getStatus(link){
-    const n=link.querySelector('[data-editor-id="eventCardStatusLabel"]');
-    const value=norm(n?.textContent);
-    const m=value.match(/^(\d{1,3}[′']|\d{1,2}:\d{2}|HT|FT)(.*)$/i);
-    return {minute:m?m[1]:value,phase:m?norm(m[2]):'',live:/\d[′']/.test(value)};
-  }
-  const feeds=new Map();
-  const seen=new Set();
-  let failures=0;
-  const scoreHistory=new Map();
-  function categoryText(node){
-    if(!node)return [];
-    const walker=document.createTreeWalker(node,NodeFilter.SHOW_TEXT),items=[];let t;
-    while((t=walker.nextNode())){const value=norm(t.nodeValue);if(value)items.push(value)}
-    return items;
-  }
-  function extract(card){
-    const link=card.querySelector('a[data-editor-id="eventCardContent"][href]');
-    const category=card.querySelector('[data-editor-id="eventCardCategory"]');
-    if(!link||!category)return null;
-    const teams=getTeams(link),scores=getScores(link);
-    if(teams.length!==2||teams.some(t=>!t.name)||!scores)return null;
-    const parts=categoryText(category),country=parts.length>1?parts[0]:'';
-    const league=parts.length>1?parts.slice(1).join(' · '):(parts[0]||'Матч');
-    const icon=category.querySelector('img,svg');
-    const status=getStatus(link);
-    const href=link.getAttribute('href');
-    if(!href||href==='#')return null;
-    return {href,teams,scores,status,country,league,icon:icon?.outerHTML||''};
-  }
-  function getHost(cards){
-    let n=cards[0].parentElement;
-    for(let i=0;i<8&&n;i++,n=n.parentElement){
-      if(n.querySelectorAll('[data-editor-id="eventCard"]').length>=2 && n.parentElement)return n;
+    if (teams.some(team => !team.name)) return null;
+    const state = status(link.querySelector('[data-editor-id="eventCardStatusLabel"]')?.textContent);
+    const scoreArea = link.querySelector('[data-editor-id="eventCardScore"],[class*="sc-7l8my2-0"]');
+    let scores = null;
+    if (scoreArea) {
+      const values = [...scoreArea.querySelectorAll('*')]
+        .filter(e => !e.children.length && norm(e.textContent)).map(e => norm(e.textContent));
+      if (values.length === 2 && values.every(v => /^\d{1,3}$/.test(v))) scores = values;
+      else if (values.some(v => !/^[-–—]$/.test(v))) return null;
     }
-    return cards[0].parentElement;
+    if (!scores && (state.live || !/\d{1,2}:\d{2}/.test(state.text))) return null;
+    const walker = document.createTreeWalker(category, NodeFilter.SHOW_TEXT);
+    const parts = []; let node;
+    while ((node = walker.nextNode())) if (norm(node.nodeValue)) parts.push(norm(node.nodeValue));
+    if (!parts.length) return null;
+    return { href, teams, scores: scores || ['—', '—'], status: state,
+      country: parts.length > 1 ? parts[0] : '', league: parts.length > 1 ? parts.slice(1).join(' · ') : parts[0], icon: imageURL(category) };
   }
-  function paintEvent(d){
-    const a=document.createElement('a');a.className='bc2-event';a.href=d.href;
-    a.innerHTML='<div class="bc2-time"><div class="bc2-minute '+(d.status.live?'live':'')+'">'+esc(d.status.minute)+'</div><div class="bc2-period">'+esc(d.status.phase)+'</div></div>'+
-    '<div class="bc2-teams">'+d.teams.map(t=>'<div class="bc2-team"><div class="bc2-teamlogo">'+t.logo+'</div><div class="bc2-name">'+esc(t.name)+'</div></div>').join('')+'</div>'+
-    '<div class="bc2-scores">'+d.scores.map(x=>'<div class="bc2-score">'+esc(x)+'</div>').join('')+'</div><div class="bc2-bell">'+bell+'</div>';
-    return a;
+  function el(tag, cls, value) {
+    const node = document.createElement(tag); node.className = cls;
+    if (value !== undefined) node.textContent = value;
+    return node;
   }
-  function refresh(){
-    if(stopped)return {status:'disabled'};
-    let events=0,groups=0;
-    for(const root of roots()){
-      const cards=[...root.querySelectorAll('[data-editor-id="eventCard"]')].filter(c=>!c.closest('.bc2-feed'));
-      if(!cards.length)continue;
-      const matched=cards.map(c=>({card:c,data:extract(c)})).filter(x=>x.data);
-      if(!matched.length)continue;
-      const host=getHost(cards),mount=host?.parentElement;
-      if(!mount)continue;
-      const signature=JSON.stringify(matched.map(x=>x.data));
-      const old=feeds.get(root);
-      if(old?.signature===signature && old.el.isConnected)continue;
-      if(!root.querySelector('#'+STYLE_ID)){
-        const st=document.createElement('style');st.id=STYLE_ID;st.textContent=css;
-        (root===document?(document.head||document.documentElement):root).appendChild(st);styles.add(st);
+  function setText(node, value) { if (node.textContent !== value) node.textContent = value; }
+  function setLogo(node, url, fallback) {
+    if (node.dataset.logo === url && node.dataset.fallback === fallback) return;
+    node.dataset.logo = url; node.dataset.fallback = fallback;
+    node.replaceChildren(); node.setAttribute('aria-hidden', 'true');
+    if (url) {
+      const img = document.createElement('img'); img.alt = ''; img.src = url;
+      img.addEventListener('error', () => node.replaceChildren(document.createTextNode(fallback)), { once: true });
+      node.append(img);
+    } else node.textContent = fallback;
+  }
+  function makeEvent() {
+    const a = el('a', 'bc2-event');
+    const time = el('div', 'bc2-time'), minute = el('div', 'bc2-minute'), phase = el('div', 'bc2-period');
+    time.append(minute, phase);
+    const teams = el('div', 'bc2-teams'), scores = el('div', 'bc2-scores');
+    const items = [0, 1].map(() => {
+      const row = el('div', 'bc2-team'), logo = el('span', 'bc2-teamlogo'), name = el('span', 'bc2-name'), score = el('span', 'bc2-score');
+      row.append(logo, name); teams.append(row); scores.append(score);
+      return { logo, name, score, flashTimer: null };
+    });
+    a.append(time, teams, scores); return { a, minute, phase, items, data: null };
+  }
+  function clearFlash(item) {
+    if (item.flashTimer !== null) { clearTimeout(item.flashTimer); timers.delete(item.flashTimer); item.flashTimer = null; }
+    item.score.classList.remove('bc-goal-flash');
+  }
+  function updateEvent(record, data) {
+    record.a.href = data.href;
+    setText(record.minute, data.status.text); record.minute.classList.toggle('live', data.status.live);
+    setText(record.phase, data.status.phase);
+    data.teams.forEach((team, i) => {
+      const item = record.items[i];
+      setLogo(item.logo, team.logo, team.name.slice(0, 1));
+      setText(item.name, team.name); item.name.title = team.name;
+      setText(item.score, data.scores[i]);
+      const previous = record.data?.scores[i];
+      if (/^\d+$/.test(previous ?? '') && /^\d+$/.test(data.scores[i]) && Number(data.scores[i]) > Number(previous)) {
+        clearFlash(item); item.score.classList.add('bc-goal-flash');
+        item.flashTimer = setTimeout(() => clearFlash(item), 1300); timers.add(item.flashTimer);
       }
-      const feed=document.createElement('div');feed.className='bc2-feed';
-      const byLeague=new Map();
-      for(const {data:d} of matched){
-        const key=d.country+'|'+d.league;
-        let group=byLeague.get(key);
-        if(!group){
-          group=document.createElement('div');group.className='bc2-group';
-          group.innerHTML='<div class="bc2-head"><div class="bc2-logo">'+d.icon+'</div><div><div class="bc2-title">'+esc(d.league)+'</div><div class="bc2-country">'+esc(d.country)+'</div></div></div>';
-          byLeague.set(key,group);feed.appendChild(group);
-        }
-        group.appendChild(paintEvent(d));
-      }
-      try{mount.insertBefore(feed,host)}catch(e){failures++;continue;}
-      // Animate only an actual increase in score. No simulated changes to match data.
-      for(const a of feed.querySelectorAll('.bc2-event')){
-        const href=a.getAttribute('href');
-        const current=[...a.querySelectorAll('.bc2-score')].map(el=>Number(el.textContent.trim()));
-        const previous=scoreHistory.get(href);
-        if(previous && current.length===2){
-          current.forEach((score,index)=>{
-            if(Number.isFinite(score) && score>previous[index]){
-              const target=a.querySelectorAll('.bc2-score')[index];
-              target?.classList.add('bc-goal-flash');
-              target?.addEventListener('animationend',()=>target.classList.remove('bc-goal-flash'),{once:true});
-            }
-          });
-        }
-        if(current.length===2 && current.every(Number.isFinite))scoreHistory.set(href,current);
-      }
-      old?.el.remove();
-      feeds.set(root,{el:feed,signature});
-      for(const {card} of matched){card.classList.add('bc-m-v014');seen.add(card);}
-      events+=matched.length;groups+=byLeague.size;
+    });
+    record.data = data;
+  }
+  function removeFeed(host) {
+    const feed = feeds.get(host); if (!feed) return;
+    for (const event of feed.events.values()) event.items.forEach(clearFlash);
+    feed.el.remove(); feeds.delete(host);
+  }
+  // Move only when order actually changed: live updates preserve focused nodes.
+  function order(parent, nodes) {
+    nodes.forEach((node, index) => { if (parent.children[index] !== node) parent.insertBefore(node, parent.children[index] || null); });
+  }
+  function syncFeed(host, records) {
+    let feed = feeds.get(host);
+    if (!feed || !feed.el.isConnected) {
+      removeFeed(host);
+      feed = { el: el('div', 'bc2-feed'), events: new Map(), groups: new Map() };
+      host.insertBefore(feed.el, records[0].card); feeds.set(host, feed);
     }
-    return {status:'active',version:'2.5.0',events,groups,feeds:feeds.size,failures};
+    const wanted = new Set(), leagues = new Map();
+    for (const { data } of records) {
+      wanted.add(data.href);
+      const key = JSON.stringify([data.country, data.league]);
+      if (!leagues.has(key)) leagues.set(key, { data, events: [] });
+      let event = feed.events.get(data.href);
+      if (!event) { event = makeEvent(); feed.events.set(data.href, event); }
+      updateEvent(event, data); leagues.get(key).events.push(event.a);
+    }
+    for (const [key, event] of feed.events) if (!wanted.has(key)) {
+      event.items.forEach(clearFlash); event.a.remove(); feed.events.delete(key);
+    }
+    for (const [key, group] of feed.groups) if (!leagues.has(key)) { group.el.remove(); feed.groups.delete(key); }
+    const groups = [];
+    for (const [key, { data, events }] of leagues) {
+      let group = feed.groups.get(key);
+      if (!group) {
+        const box = el('section', 'bc2-group'), head = el('div', 'bc2-head'), logo = el('div', 'bc2-logo');
+        const labels = el('div', 'bc2-labels'), title = el('div', 'bc2-title', data.league), country = el('div', 'bc2-country', data.country);
+        labels.append(title, country); head.append(logo, labels); box.append(head);
+        group = { el: box, head, logo }; feed.groups.set(key, group);
+      }
+      setLogo(group.logo, data.icon, '◇'); order(group.el, [group.head, ...events]); groups.push(group.el);
+    }
+    order(feed.el, groups);
   }
-  function disable(){
-    stopped=true;clearInterval(timer);
-    for(const {el} of feeds.values())el.remove();feeds.clear();
-    for(const card of seen)card.classList.remove('bc-m-v014');seen.clear();
-    for(const st of styles)st.remove();styles.clear();scoreHistory.clear();
-    delete window[KEY];return {status:'disabled'};
+  function snapshot() {
+    return { status: stopped ? 'disabled' : 'active', version: '2.6.0', roots: roots.size,
+      feeds: feeds.size, visibleEvents: [...feeds.values()].reduce((n, f) => n + f.events.size, 0), failures };
   }
-  const api={refresh,audit:()=>({version:'2.5.0',...refresh(),visibleEvents:[...feeds.values()].reduce((n,v)=>n+v.el.querySelectorAll('.bc2-event').length,0),visibleGroups:[...feeds.values()].reduce((n,v)=>n+v.el.querySelectorAll('.bc2-group').length,0)}),disable};window[KEY]=api;
-  timer=setInterval(refresh,1800);
-  console.info('[BC.GAME Match Cards v2.5]',refresh());
+  function refresh() {
+    if (stopped) return snapshot();
+    const batches = new Map(), accepted = new Set();
+    for (const [root, state] of roots) {
+      if (root !== document && !root.host.isConnected) {
+        state.observer.disconnect(); state.style.remove(); roots.delete(root); continue;
+      }
+      for (const card of root.querySelectorAll(CARD)) {
+        if (card.closest('.bc2-feed')) continue;
+        try {
+          const data = extract(card); if (!data || !card.parentElement) continue;
+          const host = card.parentElement;
+          if (!batches.has(host)) batches.set(host, []);
+          const records = batches.get(host);
+          if (!records.some(x => x.data.href === data.href)) records.push({ card, data });
+        } catch { failures++; }
+      }
+    }
+    for (const host of feeds.keys()) if (!batches.has(host) || !host.isConnected) removeFeed(host);
+    for (const [host, records] of batches) {
+      try { syncFeed(host, records); records.forEach(({ card }) => accepted.add(card)); }
+      catch { failures++; removeFeed(host); }
+    }
+    for (const card of hidden) if (!accepted.has(card)) { card.classList.remove('bc-m-v014'); hidden.delete(card); }
+    for (const card of accepted) { card.classList.add('bc-m-v014'); hidden.add(card); }
+    return snapshot();
+  }
+  function schedule() {
+    if (stopped || pending !== null) return;
+    pending = setTimeout(() => { pending = null; discover(); refresh(); }, 100);
+  }
+  function discover() {
+    const queue = [document];
+    for (let i = 0; i < queue.length; i++) {
+      const root = queue[i];
+      if (!roots.has(root)) {
+        const style = document.createElement('style'); style.id = STYLE_ID;
+        style.dataset.bcMatchStyle = ''; style.textContent = css;
+        (root === document ? document.head || document.documentElement : root).append(style);
+        const observer = new MutationObserver(changes => {
+          if (changes.some(change => {
+            const target = change.target.nodeType === 1 ? change.target : change.target.parentElement;
+            if (target?.closest(OWN)) return false;
+            if (change.type === 'childList' && [...change.addedNodes, ...change.removedNodes].every(n => n.nodeType === 1 && n.matches(OWN))) return false;
+            return true;
+          })) schedule();
+        });
+        observer.observe(root, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['href', 'src'] });
+        roots.set(root, { style, observer });
+      }
+      for (const node of root.querySelectorAll('*')) if (node.shadowRoot) queue.push(node.shadowRoot);
+    }
+  }
+  function disable() {
+    stopped = true; clearTimeout(pending); clearInterval(discoveryTimer);
+    for (const state of roots.values()) { state.observer.disconnect(); state.style.remove(); }
+    roots.clear(); for (const host of feeds.keys()) removeFeed(host);
+    for (const card of hidden) card.classList.remove('bc-m-v014'); hidden.clear();
+    for (const timer of timers) clearTimeout(timer); timers.clear();
+    delete window[KEY]; return snapshot();
+  }
+  window[KEY] = { refresh: () => { discover(); return refresh(); }, audit: snapshot, disable };
+  discover(); refresh();
+  // attachShadow itself produces no document mutation; low-frequency discovery is the fallback.
+  discoveryTimer = setInterval(() => { if (!document.hidden) { discover(); refresh(); } }, 5000);
 })();

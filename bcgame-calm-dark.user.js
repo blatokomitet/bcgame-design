@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BC.GAME Design — Calm Dark 1.0
 // @namespace    https://github.com/blatokomitet/bcgame-design
-// @version      1.2.1
+// @version      1.3.0
 // @description  Calm graphite, stable fixed 70% gradient dock, 13px body font.
 // @match        https://bcgame.st/*
 // @match        https://*.bcgame.st/*
@@ -17,6 +17,10 @@
   'use strict';
   const KEY = '__bcCalmDarkFourColorsV100';
   if (window[KEY]) return;
+  if (window.__bcChromeV19CheckpointInstalled) {
+    console.warn('[BC Calm Dark] Chrome Dock is already active. Enable only one dock script.');
+    return;
+  }
   const COLOR = Object.freeze({
     page: '#202126',
     header: '#24282D',
@@ -40,6 +44,7 @@
   const ROOTS = new Set();
   const STYLES = new Set();
   const OBSERVERS = new Set();
+  const ROOT_OBSERVERS = new Map();
   const MARKS = new Map();
   let mainSurface = null;
   let timer = null;
@@ -110,7 +115,13 @@
   function center(r) { return (r.left + r.right) / 2; }
 
   function applyDock() {
-    if (disposed || document.documentElement.clientWidth >= 600) return;
+    if (disposed) return;
+    if (document.documentElement.clientWidth >= 600) {
+      dockObserver?.disconnect(); dockObserver = null;
+      if (dock) resetOverrides(dock, [...(OVERRIDES.get(dock)?.keys() || [])]);
+      dock = null; lastDockMetrics = { status: 'DESKTOP' };
+      return;
+    }
     let bar = null;
     for (const root of ROOTS) {
       bar = root.querySelector('.tabbar');
@@ -229,6 +240,7 @@
     });
     observer.observe(root, { childList: true, subtree: true });
     OBSERVERS.add(observer);
+    ROOT_OBSERVERS.set(root, { observer, style });
   }
 
   function discoverRoots() {
@@ -325,6 +337,20 @@
 
   function refresh() {
     if (disposed) return;
+    for (const [root, state] of ROOT_OBSERVERS) {
+      if (root !== document && !root.host.isConnected) {
+        state.observer.disconnect(); state.style.remove();
+        OBSERVERS.delete(state.observer); STYLES.delete(state.style);
+        ROOTS.delete(root); ROOT_OBSERVERS.delete(root);
+      }
+    }
+    for (const [el, attrs] of MARKS) if (!el.isConnected) {
+      for (const [name, original] of attrs) {
+        if (original === null) el.removeAttribute(name); else el.setAttribute(name, original);
+      }
+      MARKS.delete(el);
+    }
+    for (const [el, props] of OVERRIDES) if (!el.isConnected) resetOverrides(el, [...props.keys()]);
     discoverRoots();
     panelTheme();
     paintNavigation();
@@ -355,6 +381,7 @@
       }
     }
     OBSERVERS.clear();
+    ROOT_OBSERVERS.clear();
     STYLES.clear();
     ROOTS.clear();
     MARKS.clear();
@@ -384,3 +411,4 @@
     pending.add(id);
   });
 })();
+
