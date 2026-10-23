@@ -180,7 +180,7 @@
     return nodes.filter(n =>
       n.text.length >= 2 && !isStatus(n.text) &&
       !/^\d+(?:[.:]\d+)?$/.test(n.text) &&
-      n.x >= minX && n.x+n.w < s.left+5 &&
+      n.x >= minX && n.x < s.left-14 &&
       !used.has(n.text)
     ).sort((a,b)=>
       (Math.abs(a.y-cy)*3 - a.x*.02) -
@@ -364,6 +364,9 @@
     }
     for(const child of placement.children){
       if(child!==view && !child.contains(view))saveAndHide(child);
+    }
+    for(const native of nativeStyles.keys()){
+      if(!native.isConnected)nativeStyles.delete(native);
     }
     lastError='';
   }
