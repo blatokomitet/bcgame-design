@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BC.GAME — LIVE Football Cards
 // @namespace    https://github.com/blatokomitet/bcgame-design
-// @version      1.0.1
+// @version      1.0.2
 // @description  Refine existing BC.GAME football live cards: smaller muted league logos, larger red score, no in-card bells
 // @match        https://bcgame.st/*
 // @match        https://*.bcgame.st/*
@@ -126,6 +126,21 @@
         }
       }
     }
+    // BC.GAME's match-alert column is a styled-component and is sometimes
+    // built without <button> or <svg> in the same DOM subtree.
+    // This is the narrowly scoped right-side slot identified in the
+    // earlier BC.GAME match-card layout test (not the top-page bell).
+    if (!bell) {
+      const slot = group.querySelector(
+        ':scope > .sc-1nrofdy-2 > .sc-1nrofdy-3:last-child'
+      );
+      if (slot &&
+          !slot.querySelector('.sc-1oeg2ad-1') &&
+          !slot.querySelector('a[href*="/sports/soccer/"]') &&
+          slot.textContent.trim().length < 24) {
+        bell = slot;
+      }
+    }
     if (bell && !bell.hasAttribute('data-bc-live-bell-v1')) {
       bell.setAttribute('data-bc-live-bell-v1', '');
       bells.add(bell);
@@ -134,10 +149,26 @@
 
   function apply() {
     if (!active || !root || !isLivePage()) return;
-    matchGroups().forEach(group => {
+    const currentGroups = matchGroups();
+    currentGroups.forEach(group => {
       markLeagueLogo(group);
       markInCardBell(group);
     });
+    // A live card can replace its DOM children while keeping the same
+    // parent; unmark superseded icons to avoid accumulation over time.
+    const liveLogos = new Set(
+      currentGroups.map(group => group.querySelector('[data-bc-live-league-v1]'))
+        .filter(Boolean)
+    );
+    for (const icon of leagueIcons) {
+      if (!icon.isConnected || !liveLogos.has(icon)) {
+        icon.removeAttribute('data-bc-live-league-v1');
+        leagueIcons.delete(icon);
+      }
+    }
+    for (const bell of bells) {
+      if (!bell.isConnected) bells.delete(bell);
+    }
   }
 
   function installOnRoot(candidate) {
