@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile, unlink } from 'node:fs/promises';
 import { chromium } from 'playwright';
 const port = process.env.TEST_PORT || '4276';
 const base = `http://127.0.0.1:${port}`;
@@ -57,6 +57,15 @@ try {
     assert.equal((await page.request.get(base + path)).status(), 404);
   }
   assert.equal(await page.locator('meta[name="bc-dev-server"]').count(), 1);
+  const probe = 'preview/reload-probe.css';
+  try {
+    await Promise.all([
+      page.waitForEvent('load', { timeout: 10000 }),
+      writeFile(probe, '/* temporary auto-reload test */')
+    ]);
+    assert.equal(await page.evaluate(() => performance.getEntriesByType('navigation')[0].type), 'reload');
+    await page.waitForSelector('.bc2-event');
+  } finally { await unlink(probe).catch(() => {}); }
   assert.deepEqual(errors, []);
-  console.log('PASS scenarios, persistent nodes, reduced motion, menu, rollback, and server boundaries');
+  console.log('PASS scenarios, persistent nodes, reduced motion, menu, rollback, server boundaries, and live reload');
 } finally { await browser?.close(); server.kill(); }
