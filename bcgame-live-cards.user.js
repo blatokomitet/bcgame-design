@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BC.GAME — LIVE Football Cards
 // @namespace    https://github.com/blatokomitet/bcgame-design
-// @version      1.0.0
+// @version      1.0.1
 // @description  Refine existing BC.GAME football live cards: smaller muted league logos, larger red score, no in-card bells
 // @match        https://bcgame.st/*
 // @match        https://*.bcgame.st/*
@@ -222,12 +222,16 @@
     leagueIcons.clear();
     bells.clear();
     delete window[KEY];
+    if (window.bcLiveCardRefinement === api) delete window.bcLiveCardRefinement;
     return 'BC.GAME LIVE Cards: стили отключены, исходные элементы восстановлены.';
   }
 
   // If an earlier temporary Eruda version is active, avoid double styling.
   try { window.bcLiveCardRefinement?.restore?.(); } catch (e) {}
   const interval = setInterval(tick, 1500);
-  window[KEY] = {status, restore};
+  const api = {status, restore};
+  window[KEY] = api;
+  // Compatibility with the earlier Eruda command used in this project.
+  window.bcLiveCardRefinement = api;
   tick();
 })();
