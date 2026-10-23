@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         BC.GAME Match Cards — Shadow DOM v0.1.4
+// @name         BC.GAME Match Cards — Shadow DOM v0.1.5
 // @namespace    https://github.com/blatokomitet/bcgame-design
-// @version      0.1.4
+// @version      0.1.5
 // @description  Beta: match cards using original BC.GAME data, logos, links and live scores. No popups.
 // @match        https://bcgame.st/*
 // @match        https://*.bcgame.st/*
@@ -30,26 +30,26 @@
     return out;
   };
   const css = `
-[data-editor-id="eventCard"].bc-m-v014 {background:#1b2023!important;border:1px solid #2b3437!important;border-radius:22px!important;overflow:hidden!important;margin-bottom:14px!important;box-shadow:0 7px 20px #0002!important}
+[data-editor-id="eventCard"].bc-m-v014 {background:#1b2023!important;border:1px solid #2b3437!important;border-radius:22px!important;overflow:hidden!important;margin-bottom:12px!important;box-shadow:0 7px 20px #0002!important;height:auto!important;min-height:0!important;padding:0!important;}
 [data-editor-id="eventCard"].bc-m-v014 > :not(.bc-m-shell) {display:none!important}
-.bc-m-shell{display:block!important;color:#f1f3f3!important;text-decoration:none!important;padding:18px 14px 16px!important;min-height:147px!important;box-sizing:border-box!important}
-.bc-m-header{display:flex!important;align-items:center!important;gap:12px!important;margin-bottom:18px!important;min-width:0!important}
-.bc-m-league-icon{flex:0 0 38px!important;width:38px!important;height:38px!important;display:grid!important;place-items:center!important}
+.bc-m-shell{display:block!important;color:#f1f3f3!important;text-decoration:none!important;padding:14px 14px 14px!important;min-height:0!important;height:auto!important;box-sizing:border-box!important}
+.bc-m-header{display:flex!important;align-items:center!important;gap:12px!important;margin-bottom:12px!important;min-width:0!important}
+.bc-m-header:empty{display:none!important}.bc-m-league-icon{flex:0 0 38px!important;width:38px!important;height:38px!important;display:grid!important;place-items:center!important}
 .bc-m-league-icon img,.bc-m-league-icon svg{width:34px!important;height:34px!important;object-fit:contain!important}
 .bc-m-labels{min-width:0!important;flex:1!important}
 .bc-m-league{font-size:15px!important;font-weight:700!important;line-height:1.3!important;color:#f3f5f5!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}
 .bc-m-country{font-size:12px!important;color:#98a4a7!important;margin-top:4px!important}
 .bc-m-body{display:grid!important;grid-template-columns:46px minmax(0,1fr) 25px 36px!important;gap:8px!important;align-items:center!important}
-.bc-m-time{display:flex!important;flex-direction:column!important;align-items:center!important;gap:15px!important}
+.bc-m-time{display:flex!important;flex-direction:column!important;align-items:center!important;gap:9px!important}
 .bc-m-minute{font-size:12px!important;font-weight:600!important;color:#ff606d!important;white-space:nowrap!important}
 .bc-m-minute.live::before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:#ff5966;margin-right:5px;vertical-align:2px;animation:bc-m-pulse 1.9s infinite}
 .bc-m-phase{font-size:10px!important;line-height:1.1!important;text-align:center!important;color:#97a3a7!important}
-.bc-m-teams{display:flex!important;flex-direction:column!important;gap:13px!important;min-width:0!important}
+.bc-m-teams{display:flex!important;flex-direction:column!important;gap:7px!important;min-width:0!important}
 .bc-m-team{display:flex!important;align-items:center!important;gap:9px!important;min-width:0!important;min-height:28px!important}
 .bc-m-team-logo{width:26px!important;height:26px!important;flex:0 0 26px!important;display:grid!important;place-items:center!important;overflow:hidden!important}
 .bc-m-team-logo img,.bc-m-team-logo svg{width:25px!important;height:25px!important;object-fit:contain!important}
 .bc-m-name{font-size:14px!important;font-weight:600!important;line-height:1.25!important;color:#edf0f1!important;min-width:0!important;overflow-wrap:anywhere!important}
-.bc-m-scores{display:flex!important;flex-direction:column!important;align-items:center!important;gap:13px!important}
+.bc-m-scores{display:flex!important;flex-direction:column!important;align-items:center!important;gap:7px!important}
 .bc-m-score{font-size:20px!important;font-weight:800!important;line-height:28px!important;color:#fc5966!important;text-align:center!important}
 .bc-m-bell{width:32px!important;height:32px!important;border:1px solid #435054!important;border-radius:50%!important;display:grid!important;place-items:center!important;pointer-events:none!important}
 .bc-m-bell svg{width:17px!important;height:17px!important;fill:none!important;stroke:#a1acaf!important;stroke-width:1.7!important}
@@ -81,8 +81,8 @@
     if(!cat)return null;
     const texts=directLeaves(cat).map(e=>norm(e.textContent)).filter(Boolean);
     const icon=cat.querySelector('img,svg');
-    const country=texts[0]||'';
-    const league=texts.slice(1).find(s=>s!==country)||texts[0]||'';
+    const country=texts.length>1?texts[0]:'';
+    const league=texts.slice(1).find(s=>s!==country)||(texts.length===1?texts[0]:'');
     return {country,league,icon:icon?.outerHTML||''};
   }
   function getStatus(link){
@@ -103,7 +103,7 @@
     let shell=[...card.children].find(c=>c.classList?.contains('bc-m-shell'));
     if(!shell){shell=document.createElement('a');shell.className='bc-m-shell';card.appendChild(shell);}
     shell.setAttribute('href',href);
-    shell.innerHTML='<div class="bc-m-header"><span class="bc-m-league-icon">'+league.icon+'</span><span class="bc-m-labels"><div class="bc-m-league">'+esc(league.league)+'</div><div class="bc-m-country">'+esc(league.country)+'</div></span></div>'+
+    shell.innerHTML=(league.league?'<div class="bc-m-header"><span class="bc-m-league-icon">'+league.icon+'</span><span class="bc-m-labels"><div class="bc-m-league">'+esc(league.league)+'</div><div class="bc-m-country">'+esc(league.country)+'</div></span></div>':'')+
     '<div class="bc-m-body"><div class="bc-m-time"><span class="bc-m-minute '+(status.live?'live':'')+'">'+esc(status.minute)+'</span><span class="bc-m-phase">'+esc(status.phase)+'</span></div>'+
     '<div class="bc-m-teams">'+teams.map(t=>'<div class="bc-m-team"><span class="bc-m-team-logo">'+t.logo+'</span><span class="bc-m-name">'+esc(t.name)+'</span></div>').join('')+'</div>'+
     '<div class="bc-m-scores">'+scores.map(s=>'<span class="bc-m-score">'+esc(s)+'</span>').join('')+'</div><span class="bc-m-bell">'+bell+'</span></div>';
@@ -120,9 +120,9 @@
         const style=document.createElement('style');style.id=STYLE_ID;style.textContent=css;
         (root===document?(document.head||document.documentElement):root).appendChild(style);styles.add(style);
       }
-      cards.forEach(card=>{found++;try{if(update(card))rendered++;}catch(e){console.warn('[BC Match v0.1.4] skip card',e);}});
+      cards.forEach(card=>{found++;try{if(update(card))rendered++;}catch(e){console.warn('[BC Match v0.1.5] skip card',e);}});
     }
-    return {status:'active',version:'0.1.4',found,rendered};
+    return {status:'active',version:'0.1.5',found,rendered};
   }
   function disable(){
     stopped=true;clearInterval(timer);
@@ -132,5 +132,5 @@
   }
   const api={refresh,audit:refresh,disable};window[KEY]=api;
   timer=setInterval(refresh,2000);
-  console.info('[BC.GAME Match Cards v0.1.4]',refresh());
+  console.info('[BC.GAME Match Cards v0.1.5]',refresh());
 })();
