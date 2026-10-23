@@ -37,7 +37,7 @@ function scan(){
  return count;
 }
 function audit(){
- const leafs=[...document.querySelectorAll('body *')].filter(e=>e.children.length===0&&e.textContent&&/^(?:\\d{1,2}['′]|HT|FT|\\d{1,2}:\\d{2})$/.test(e.textContent.trim())).slice(0,25);
+ const leafs=[...document.querySelectorAll('body *')].filter(e=>e.children.length===0&&e.textContent&&/^(?:\d{1,2}['′]|HT|FT|\d{1,2}:\d{2})$/.test(e.textContent.trim())).slice(0,25);
  const describe=e=>({tag:e.tagName,cls:String(e.className||'').slice(0,140),role:e.getAttribute('role'),href:e.getAttribute('href'),text:(e.innerText||'').trim().slice(0,145),html:e.outerHTML.slice(0,280)});
  const samples=leafs.slice(0,8).map(e=>({marker:e.textContent.trim(),self:describe(e),parent: e.parentElement?describe(e.parentElement):null,grandparent:e.parentElement?.parentElement?describe(e.parentElement.parentElement):null}));
  const anchors=[...document.querySelectorAll('a[href]')];
