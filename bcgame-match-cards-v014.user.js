@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         BC.GAME Match Cards — Shadow DOM v2.1
+// @name         BC.GAME Match Cards — Shadow DOM v2.3
 // @namespace    https://github.com/blatokomitet/bcgame-design
-// @version      2.1.0
+// @version      2.3.0
 // @description  Beta: match cards using original BC.GAME data, logos, links and live scores. No popups.
 // @match        https://bcgame.st/*
 // @match        https://*.bcgame.st/*
@@ -66,6 +66,16 @@
 .bc2-feed .bc2-minute{font-size:13px!important}
 .bc2-feed .bc2-period{font-size:11px!important}
 .bc2-feed .bc2-bell{height:32px!important;width:32px!important}
+
+/* Independent layout: prevent global styled-components rules from stretching groups. */
+.bc2-feed{display:flex!important;flex-direction:column!important;align-items:stretch!important;justify-content:flex-start!important;height:auto!important;min-height:0!important}
+.bc2-feed > .bc2-group{display:flex!important;flex-direction:column!important;align-items:stretch!important;justify-content:flex-start!important;align-content:initial!important;box-sizing:border-box!important;position:relative!important;height:auto!important;min-height:0!important;max-height:none!important;margin:0!important;padding:0!important;gap:0!important;flex:none!important}
+.bc2-feed .bc2-group > .bc2-head{display:flex!important;position:relative!important;flex:0 0 auto!important;height:auto!important;min-height:0!important;max-height:none!important;box-sizing:border-box!important;padding:13px 14px 8px!important;margin:0!important;justify-content:flex-start!important;align-self:stretch!important}
+.bc2-feed .bc2-group > .bc2-event{display:grid!important;position:relative!important;flex:none!important;align-self:stretch!important;box-sizing:border-box!important;height:auto!important;min-height:0!important;max-height:none!important;padding:8px 12px 14px!important;margin:0!important;grid-template-columns:49px minmax(0,1fr) 27px 34px!important;grid-template-rows:auto!important;align-content:center!important;align-items:center!important;justify-content:normal!important;gap:8px!important}
+.bc2-feed .bc2-event > .bc2-time,.bc2-feed .bc2-event > .bc2-teams,.bc2-feed .bc2-event > .bc2-scores{display:flex!important;position:relative!important;height:auto!important;min-height:0!important;max-height:none!important;padding:0!important;margin:0!important;gap:8px!important;align-self:center!important;justify-content:center!important}
+.bc2-feed .bc2-event .bc2-team{height:auto!important;min-height:28px!important;max-height:none!important}
+.bc2-feed .bc2-event .bc2-name{font-size:14px!important;line-height:1.25!important;overflow-wrap:anywhere!important}
+.bc2-feed .bc2-event .bc2-score{font-size:22px!important;line-height:28px!important}
 @keyframes bc2pulse{50%{opacity:.3;transform:scale(.75)}}@media(prefers-reduced-motion:reduce){.bc2-minute.live:before{animation:none!important}}
 `;
   const bell = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 6-3 7-3 9h18c0-2-3-3-3-9M10 21h4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -163,7 +173,7 @@
         const key=d.country+'|'+d.league;
         let group=byLeague.get(key);
         if(!group){
-          group=document.createElement('section');group.className='bc2-group';
+          group=document.createElement('div');group.className='bc2-group';
           group.innerHTML='<div class="bc2-head"><div class="bc2-logo">'+d.icon+'</div><div><div class="bc2-title">'+esc(d.league)+'</div><div class="bc2-country">'+esc(d.country)+'</div></div></div>';
           byLeague.set(key,group);feed.appendChild(group);
         }
@@ -175,7 +185,7 @@
       for(const {card} of matched){card.classList.add('bc-m-v014');seen.add(card);}
       events+=matched.length;groups+=byLeague.size;
     }
-    return {status:'active',version:'2.1.0',events,groups,feeds:feeds.size,failures};
+    return {status:'active',version:'2.3.0',events,groups,feeds:feeds.size,failures};
   }
   function disable(){
     stopped=true;clearInterval(timer);
@@ -184,7 +194,7 @@
     for(const st of styles)st.remove();styles.clear();
     delete window[KEY];return {status:'disabled'};
   }
-  const api={refresh,audit:()=>({version:'2.1.0',...refresh(),visibleEvents:[...feeds.values()].reduce((n,v)=>n+v.el.querySelectorAll('.bc2-event').length,0),visibleGroups:[...feeds.values()].reduce((n,v)=>n+v.el.querySelectorAll('.bc2-group').length,0)}),disable};window[KEY]=api;
+  const api={refresh,audit:()=>({version:'2.3.0',...refresh(),visibleEvents:[...feeds.values()].reduce((n,v)=>n+v.el.querySelectorAll('.bc2-event').length,0),visibleGroups:[...feeds.values()].reduce((n,v)=>n+v.el.querySelectorAll('.bc2-group').length,0)}),disable};window[KEY]=api;
   timer=setInterval(refresh,1800);
-  console.info('[BC.GAME Match Cards v2.1]',refresh());
+  console.info('[BC.GAME Match Cards v2.3]',refresh());
 })();
