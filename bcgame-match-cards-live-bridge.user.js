@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BC.GAME Match Cards — Live Bridge
 // @namespace    https://github.com/blatokomitet/bcgame-design
-// @version      0.1.1
+// @version      0.1.2
 // @description  Safe live match-card styling test, with audit and reversible changes.
 // @match        https://bcgame.st/*
 // @match        https://*.bcgame.st/*
@@ -37,9 +37,12 @@ function scan(){
  return count;
 }
 function audit(){
- const links=[...document.querySelectorAll('a[href]')].filter(x=>x.getAttribute('href')?.includes('/sports/'));
- const rows=[...touched].filter(x=>x.isConnected);
- return {status:enabled?'active':'disabled',url:location.href,matchedLinks:links.length,markedCards:rows.length,samples:rows.slice(0,5).map(x=>({tag:x.tagName,classes:x.className,href:x.getAttribute('href')||null,images:x.querySelectorAll('img').length,text:x.innerText?.slice(0,120)}))};
+ const leafs=[...document.querySelectorAll('body *')].filter(e=>e.children.length===0&&e.textContent&&/^(?:\\d{1,2}['′]|HT|FT|\\d{1,2}:\\d{2})$/.test(e.textContent.trim())).slice(0,25);
+ const describe=e=>({tag:e.tagName,cls:String(e.className||'').slice(0,140),role:e.getAttribute('role'),href:e.getAttribute('href'),text:(e.innerText||'').trim().slice(0,145),html:e.outerHTML.slice(0,280)});
+ const samples=leafs.slice(0,8).map(e=>({marker:e.textContent.trim(),self:describe(e),parent: e.parentElement?describe(e.parentElement):null,grandparent:e.parentElement?.parentElement?describe(e.parentElement.parentElement):null}));
+ const anchors=[...document.querySelectorAll('a[href]')];
+ const imgs=[...document.querySelectorAll('img')];
+ return {version:'0.1.2',status:enabled?'active':'disabled',url:location.href,counts:{anchors:anchors.length,images:imgs.length,buttons:document.querySelectorAll('button').length,shadowHosts:[...document.querySelectorAll('*')].filter(e=>e.shadowRoot).length,matchTimeNodes:leafs.length},timeSamples:samples,linkSamples:anchors.slice(0,8).map(e=>({href:e.getAttribute('href'),text:e.innerText?.slice(0,70)})),shadowHosts:[...document.querySelectorAll('*')].filter(e=>e.shadowRoot).slice(0,8).map(e=>({tag:e.tagName,cls:e.className}))};
 }
 function disable(){enabled=false;observer?.disconnect();for(const x of touched)x.classList.remove('bc-live-bridge-highlight');touched.clear();st.remove();}
 observer=new MutationObserver(()=>{if(enabled){clearTimeout(window.__bcBridgeTimer);window.__bcBridgeTimer=setTimeout(scan,350);}});
