@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         BC.GAME — LIVE Football Cards
 // @namespace    https://github.com/blatokomitet/bcgame-design
-// @version      1.0.5
-// @description  Focused live-card bell removal; no experimental score or league restyling
+// @version      1.0.6
+// @description  Hide verified match bell controls without changing scores, league icons, or layout
 // @match        https://bcgame.st/*
 // @match        https://*.bcgame.st/*
 // @match        https://bc.game/*
@@ -17,23 +17,21 @@
   'use strict';
 
   const KEY = '__bcLiveCardsInstalledV1';
-  // Safe when re-running manually without reloading.
   if (window[KEY]?.restore) window[KEY].restore();
 
-  const VERSION = '1.0.5';
+  const VERSION = '1.0.6';
   const MATCH = 'a[href*="/sports/soccer/"]';
   const GROUP = '.sc-1nrofdy-1';
   const BELL_PATH = 'M18 9a6 6 0 0 0-12 0';
-  const ATTR = 'data-bc-hide-match-bell-v105';
+  const MARK = 'data-bc-match-bell-hidden-v106';
 
   const livePage = () => /^\/(?:[a-z]{2}\/)?sports\/live(?:\/|$)/i.test(location.pathname);
   const bounds = el => el.getBoundingClientRect();
   let root = null;
-  let sheet = null;
   let observer = null;
   let running = true;
   let pending = false;
-  const hidden = new Set();
+  const priorDisplay = new Map();
 
   function findRoot() {
     const queue = [document];
@@ -50,54 +48,72 @@
 
   function groups() {
     return root ? [...root.querySelectorAll(GROUP)]
-      .filter(g => g.querySelector(MATCH)) : [];
+      .filter(group => !!group.querySelector(MATCH)) : [];
   }
 
-  // Exact SVG path reported by Eruda, NOT the site's header notification bell.
   function isMatchBell(svg) {
     return svg.tagName.toLowerCase() === 'svg' &&
-      [...svg.querySelectorAll('path')].some(p =>
-        (p.getAttribute('d') || '').startsWith(BELL_PATH));
+      [...svg.querySelectorAll('path')].some(path =>
+        (path.getAttribute('d') || '').startsWith(BELL_PATH));
   }
 
-  // Directly target the confirmed bell container inside the match Shadow DOM.
-  // Diagnostics show .bc2-bell is NOT nested inside .sc-1nrofdy-1.
-  // The SVG path check protects against unrelated elements sharing this class.
+  // The actual bell is .bc2-bell, outside .sc-1nrofdy-1 groups.
+  // Verify the icon's exact path so we do not target the site header bell.
   function matchBellContainers() {
-    if (!root) return [];
-    return [...root.querySelectorAll('.bc2-bell')].filter(el =>
+    return root ? [...root.querySelectorAll('.bc2-bell')].filter(el =>
       [...el.querySelectorAll('svg')].some(isMatchBell)
-    );
+    ) : [];
   }
 
   function apply() {
     if (!running || !root || !livePage()) return;
-    for (const bell of matchBellContainers()) {
-      if (!bell.hasAttribute(ATTR)) bell.setAttribute(ATTR, '');
-      hidden.add(bell);
+    const current = new Set(matchBellContainers());
+    for (const bell of current) {
+      if (!priorDisplay.has(bell)) {
+        priorDisplay.set(bell, {
+          value:bell.style.getPropertyValue('display'),
+          priority:bell.style.getPropertyPriority('display')
+        });
+      }
+      // Inline !important takes precedence over the BC.GAME styles that
+      // defeated the previous injected stylesheet's display:none rule.
+      if (bell.style.getPropertyValue('display') !== 'none' ||
+          bell.style.getPropertyPriority('display') !== 'important') {
+        bell.style.setProperty('display', 'none', 'important');
+      }
+      if (!bell.hasAttribute(MARK)) bell.setAttribute(MARK, '');
     }
-    for (const node of hidden) {
-      if (!node.isConnected) hidden.delete(node);
+    for (const [bell, previous] of priorDisplay) {
+      if (!bell.isConnected) {
+        priorDisplay.delete(bell);
+      } else if (!current.has(bell)) {
+        // Restore if an element stopped being a match bell.
+        if (previous.value) bell.style.setProperty('display', previous.value, previous.priority);
+        else bell.style.removeProperty('display');
+        bell.removeAttribute(MARK);
+        priorDisplay.delete(bell);
+      }
     }
   }
 
   function uninstallRoot() {
     observer?.disconnect();
     observer = null;
-    sheet?.remove();
-    sheet = null;
-    hidden.forEach(el => el.removeAttribute(ATTR));
-    hidden.clear();
+    for (const [bell, previous] of priorDisplay) {
+      if (previous.value) {
+        bell.style.setProperty('display', previous.value, previous.priority);
+      } else {
+        bell.style.removeProperty('display');
+      }
+      bell.removeAttribute(MARK);
+    }
+    priorDisplay.clear();
     root = null;
   }
 
   function install(candidate) {
     uninstallRoot();
     root = candidate;
-    sheet = document.createElement('style');
-    sheet.id = 'bc-live-bell-only-v105';
-    sheet.textContent = '[' + ATTR + '] { display: none !important; }';
-    root.appendChild(sheet);
     apply();
     observer = new MutationObserver(() => {
       if (!running || pending) return;
@@ -116,15 +132,16 @@
       if (root) uninstallRoot();
       return;
     }
-    if (root?.host?.isConnected && sheet?.isConnected) return;
-    const found = findRoot();
-    if (found) install(found);
+    if (root?.host?.isConnected) {
+      apply();
+      return;
+    }
+    const nextRoot = findRoot();
+    if (nextRoot) install(nextRoot);
   }
 
   function status() {
-    const activeGroups = groups();
-    const exactBellIcons = root ? matchBellContainers() : [];
-    const liveHidden = [...hidden].filter(el => el.isConnected);
+    const bells = matchBellContainers();
     const visibleScores = root ? [...root.querySelectorAll(MATCH + ' .bc2-score')]
       .filter(el => {
         const r = bounds(el);
@@ -132,14 +149,14 @@
       }) : [];
     return {
       version:VERSION,
-      running, pageMatches:livePage(), shadowRootReady:!!root,
-      matchGroups:activeGroups.length,
-      exactBellIcons:exactBellIcons.length,
-      markedBellControls:liveHidden.length,
-      hiddenBellControls:liveHidden.filter(el =>
-        getComputedStyle(el).display === 'none').length,
-      actualScoreFont:visibleScores[0] ?
-        getComputedStyle(visibleScores[0]).fontSize : null,
+      running,
+      pageMatches:livePage(),
+      shadowRootReady:!!root,
+      matchGroups:groups().length,
+      exactBellIcons:bells.length,
+      markedBellControls:bells.filter(el => el.hasAttribute(MARK)).length,
+      hiddenBellControls:bells.filter(el => getComputedStyle(el).display === 'none').length,
+      actualScoreFont:visibleScores[0] ? getComputedStyle(visibleScores[0]).fontSize : null,
       actualVisibleScoreElements:visibleScores.length,
       scoreAndLeagueStylesChanged:false
     };
@@ -151,7 +168,7 @@
     uninstallRoot();
     if (window[KEY] === api) delete window[KEY];
     if (window.bcLiveCardRefinement === api) delete window.bcLiveCardRefinement;
-    return 'BC.GAME v1.0.5: notification control changes removed';
+    return 'BC.GAME v1.0.6: match bell styles restored';
   }
 
   const interval = setInterval(tick, 1500);
@@ -159,5 +176,5 @@
   window[KEY] = api;
   window.bcLiveCardRefinement = api;
   tick();
-  console.info('[BC.GAME Live Cards]',status());
+  console.info('[BC.GAME LIVE Cards]',status());
 })();
