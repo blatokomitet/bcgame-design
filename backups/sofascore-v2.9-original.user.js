@@ -1,14 +1,12 @@
 // ==UserScript==
-// @name         BC.GAME Sofascore Compact v2.9 — EXPERIMENT
+// @name         BC.GAME Sofascore Compact v2.9 — ARCHIVE
 // @namespace    https://github.com/blatokomitet/bcgame-design
 // @version      2.9.0
 // @description  Isolated 36px rows and shortened match separator
 // @match        https://bcgame.st/ru/sports/*
 // @match        https://*.bcgame.st/ru/sports/*
 // @run-at       document-start
-// @resource     sofaCSS https://raw.githubusercontent.com/blatokomitet/bcgame-design/main/experiments/sofascore-v2.9.css
-// @updateURL    https://raw.githubusercontent.com/blatokomitet/bcgame-design/main/experiments/sofascore-v2.9.user.js
-// @downloadURL  https://raw.githubusercontent.com/blatokomitet/bcgame-design/main/experiments/sofascore-v2.9.user.js
+// @resource     sofaCSS https://raw.githubusercontent.com/blatokomitet/bcgame-design/ed3a597546d521a3427d5050314c6ad974053c66/backups/sofascore-v2.9-original.css
 // @grant        GM_getResourceText
 // ==/UserScript==
 (() => {
@@ -70,3 +68,4 @@
   else start();
   console.info('[BC Sofa v2.9] Isolated preview active');
 })();
+

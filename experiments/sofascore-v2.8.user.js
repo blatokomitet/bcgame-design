@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BC.GAME Sofascore Compact v2.8 — EXPERIMENT
 // @namespace    https://github.com/blatokomitet/bcgame-design
-// @version      2.8.0
+// @version      2.8.1
 // @description  Independent compact layout test; no inline score changes
 // @match        https://bcgame.st/ru/sports/*
 // @match        https://*.bcgame.st/ru/sports/*
@@ -19,7 +19,7 @@
   const managed=new Map();
   let running=true,queued=false;
   function timeValue(s) {
-    const min=s.match(/\b\d{1,3}\s*[′']/);
+    const min=s.match(/\b\d{1,3}(?:\s*\+\s*\d{1,2})?\s*[′'](?:\s*\+\s*\d{1,2})?/);
     if(min) return min[0].replace(/\s+/g,'');
     if(/перерыв|half.?time/i.test(s)) return 'HT';
     const clock=s.match(/\b\d{1,2}:\d{2}\b/);
@@ -51,7 +51,7 @@
   }
   function schedule(){
     if(queued||!running)return;queued=true;
-    requestAnimationFrame(()=>{queued=false;scan();});
+    requestAnimationFrame(()=>{queued=false;run();});
   }
   const pageObserver=new MutationObserver(schedule);
   const rootObservers=new Map();
@@ -79,8 +79,7 @@
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});
   else start();
-  // Keep observers attached when a new root is discovered.
-  const originalScan=scan;
   // Detach safely via disabling the userscript and reloading.
   console.info('[BC v2.8] Loaded. Test only with v2.2 disabled.');
 })();
+

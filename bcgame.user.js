@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BC.GAME Design — Minimal Header v2.1
 // @namespace    https://github.com/blatokomitet/bcgame-design
-// @version      0.3.8
+// @version      0.4.0
 // @description  Mobile compact flex header with full-sized brand and aligned controls
 // @match        https://bcgame.st/*
 // @match        https://*.bcgame.st/*
@@ -20,11 +20,14 @@
   let attempts = 0;
   let timer = null;
   let active = null;
+  let observer = null;
+  let scheduled = null;
+  let disposed = false;
   let logoFit = { state: 'not-checked' };
 
   function activate() {
     const header = document.querySelector('.page-header');
-    if (!header || window.innerWidth < 360) return false;
+    if (!header || window.innerWidth < 360 || window.innerWidth > 599) return false;
     const logo = header.querySelector('a.active');
     const deposit = header.querySelector('button.button-brand');
     const balance = deposit?.parentElement;
@@ -49,8 +52,10 @@
     const popup = document.createElement('div');
     const action = document.createElement('button');
     let onOutside = null;
+    let onKeydown = null;
     const restore = () => {
       if (onOutside) document.removeEventListener('click', onOutside);
+      if (onKeydown) document.removeEventListener('keydown', onKeydown);
       menu.remove();
       popup.remove();
       for (const [el, prop, value, priority] of saved.reverse()) {
@@ -64,6 +69,8 @@
       menu.textContent = '⋯';
       menu.setAttribute('aria-label', 'Дополнительные функции');
       menu.setAttribute('aria-expanded', 'false');
+      menu.setAttribute('aria-controls', 'bc-header-overflow');
+      popup.id = 'bc-header-overflow';
       menu.style.cssText = 'display:flex;align-items:center;justify-content:center;width:34px;min-width:34px;height:38px;padding:0;border:0;border-radius:8px;color:inherit;background:rgba(255,255,255,.05);font:inherit;font-size:22px;line-height:1;cursor:pointer;flex:0 0 34px;';
       popup.hidden = true;
       popup.style.cssText = 'position:fixed;top:51px;right:12px;z-index:100001;padding:8px;border-radius:12px;background:#25302e;color:#fff;box-shadow:0 8px 28px #0007;';
@@ -80,6 +87,7 @@
         event.stopPropagation();
         popup.hidden = !popup.hidden;
         menu.setAttribute('aria-expanded', String(!popup.hidden));
+        if (!popup.hidden) action.focus();
       });
       container.insertBefore(menu, avatar);
       document.body.appendChild(popup);
@@ -232,8 +240,14 @@
         }
       };
       document.addEventListener('click',onOutside);
-      active = { header, restore };
-      console.info('[BC Header v2.1] ACTIVE', {scriptVersion:'0.3.8',logoWidth:Math.round(logo.getBoundingClientRect().width),balanceX:Math.round(rb.x),balanceWidth:Math.round(rb.width),depositX:Math.round(rd.x)});
+      onKeydown = event => {
+        if (event.key === 'Escape' && !popup.hidden) {
+          popup.hidden = true; menu.setAttribute('aria-expanded', 'false'); menu.focus();
+        }
+      };
+      document.addEventListener('keydown', onKeydown);
+      active = { header, restore, nodes: [logo, deposit, balance, gift, bell, avatar, menu] };
+      console.info('[BC Header v2.1] ACTIVE', {scriptVersion:'0.4.0',logoWidth:Math.round(logo.getBoundingClientRect().width),balanceX:Math.round(rb.x),balanceWidth:Math.round(rb.width),depositX:Math.round(rd.x)});
       return true;
     } catch (e) {
       restore();
@@ -243,14 +257,31 @@
   }
 
   const start = () => {
-    if (active && active.header.isConnected) return true;
+    if (disposed) return false;
+    if (active && active.header.isConnected && active.nodes.every(node => node.isConnected)) return true;
     if (active) active.restore();
     return activate();
   };
   window[STATE] = {
-    status: () => ({ installed:true, version:'0.3.8', active:!!active, attempts, logoFit }),
-    restore: () => { if (timer) clearInterval(timer); active?.restore(); delete window[STATE]; }
+    status: () => ({ installed:true, version:'0.4.0', active:!!active, attempts, logoFit }),
+    restore: () => {
+      disposed = true; clearInterval(timer); clearTimeout(scheduled);
+      observer?.disconnect(); window.removeEventListener('resize', onResize);
+      active?.restore(); delete window[STATE];
+    }
   };
+  function schedule() {
+    if (disposed || scheduled !== null) return;
+    scheduled = setTimeout(() => { scheduled = null; start(); }, 200);
+  }
+  function onResize() {
+    active?.restore(); schedule();
+  }
+  observer = new MutationObserver(() => {
+    if (!active || !active.header.isConnected || active.nodes.some(node => !node.isConnected)) schedule();
+  });
+  observer.observe(document.documentElement, { childList: true, subtree: true });
+  window.addEventListener('resize', onResize);
   if (!start()) {
     timer = setInterval(() => {
       attempts++;
@@ -258,3 +289,4 @@
     }, 500);
   }
 })();
+

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BC.GAME Design - Chrome Dock v1.9 (Checkpoint)
 // @namespace    https://github.com/blatokomitet/bcgame-design
-// @version      1.9.0
+// @version      1.9.1
 // @description  Saved checkpoint: full-size graphite dock, original betting slip button, curved tab, soft scroll sinking, upper sports nav without shadow.
 // @author       BC.GAME Design
 // @match        https://bcgame.st/*
@@ -19,6 +19,10 @@
 (() => {
   'use strict';
   if (window.__bcChromeV19CheckpointInstalled) return;
+  if (window.__bcCalmDarkFourColorsV100) {
+    console.warn('[BC Chrome Dock] Calm Dark is already active. Enable only one dock script.');
+    return;
+  }
   window.__bcChromeV19CheckpointInstalled = true;
 
   const saved = new Map();
