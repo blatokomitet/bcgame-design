@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BC.GAME — LIVE Football Cards
 // @namespace    https://github.com/blatokomitet/bcgame-design
-// @version      2.0.1
+// @version      2.0.2
 // @description  React-safe compact grouped Live List, reversible styles on original match elements
 // @match        https://bcgame.st/*
 // @match        https://*.bcgame.st/*
@@ -17,23 +17,42 @@
 'use strict';
 const KEY='__bcLiveCardsInstalledV1';
 try{window[KEY]?.restore?.()}catch(err){console.warn('[BC Live List] cleanup',err)}
-const VERSION='2.0.1';
-const STYLE_ID='bc-live-list-v201-css';
+const VERSION='2.0.2';
+const STYLE_ID='bc-live-list-v202-css';
 const MATCH='a.bc2-event[href*="/sports/soccer/"]';
 const BELL_PATH='M18 9a6 6 0 0 0-12 0';
 const livePage=()=>/^\/(?:[a-z]{2}\/)?sports\/live(?:\/|$)/i.test(location.pathname);
 const CSS="\n@media (max-width:768px) {\n.bc2-feed {\n  display:flex!important;flex-direction:column!important;gap:9px!important;\n  align-items:stretch!important;background:transparent!important;\n}\n.bc2-feed>.bc2-group {\n  display:flex!important;flex-direction:column!important;gap:0!important;\n  width:100%!important;height:auto!important;min-height:0!important;\n  margin:0!important;padding:0!important;overflow:hidden!important;\n  background:#191a1b!important;border:1px solid #2c2e2f!important;\n  border-radius:13px!important;box-shadow:none!important;\n}\n.bc2-feed>.bc2-group>:first-child:not(.bc2-event) {\n  display:flex!important;align-items:center!important;\n  min-height:38px!important;height:auto!important;\n  padding:7px 12px!important;margin:0!important;gap:8px!important;\n  background:#1d1e1f!important;border-bottom:1px solid #303234!important;\n  color:#e2b047!important;font-size:12px!important;\n  font-weight:800!important;letter-spacing:.25px!important;\n}\n.bc2-feed>.bc2-group>:first-child:not(.bc2-event) svg[data-cy=\"sport-soccer\"] {\n  width:20px!important;height:20px!important;min-width:20px!important;\n  min-height:20px!important;max-width:20px!important;max-height:20px!important;\n  opacity:.5!important;filter:grayscale(1)!important;flex-shrink:0!important;\n}\n.bc2-feed .bc2-group>a.bc2-event {\n  box-sizing:border-box!important;display:grid!important;\n  width:100%!important;max-width:none!important;height:70px!important;\n  min-height:70px!important;margin:0!important;padding:6px 11px!important;\n  border:0!important;border-radius:0!important;\n  background:transparent!important;color:#f4f4f4!important;\n  text-decoration:none!important;box-shadow:none!important;\n}\n.bc2-feed .bc2-group>a.bc2-event+a.bc2-event {\n  border-top:1px solid #303234!important;\n}\n.bc2-feed .bc2-event img {\n  width:21px!important;height:21px!important;\n  max-width:21px!important;max-height:21px!important;\n  object-fit:contain!important;\n}\n.bc2-feed .bc2-event svg[data-cy=\"sport-soccer\"] {\n  width:21px!important;height:21px!important;\n  max-width:21px!important;max-height:21px!important;\n}\n.bc2-feed .bc2-event .bc2-score {\n  display:block!important;font-size:23px!important;font-weight:850!important;\n  line-height:1!important;letter-spacing:-.4px!important;\n  font-variant-numeric:tabular-nums!important;color:#f5f6f5!important;\n  background:transparent!important;text-shadow:none!important;\n}\n.bc2-feed .bc2-event [class*=\"time\"],\n.bc2-feed .bc2-event [class*=\"minute\"],\n.bc2-feed .bc2-event [class*=\"status\"] {\n  color:#a2b66d!important;font-size:12px!important;font-weight:700!important;\n}\n.bc2-feed .bc2-bell {display:none!important;}\n}\n";
 let active=true,root=null,style=null,timer=null,message='Waiting for sports DOM';
+let rootProbe={shadowRoots:0,scoreRoots:0,feedRoots:0,matchedRoots:0};
 const bellStyles=new Map();
 
 function findRoot(){
+  // Identify the known scoring Shadow DOM before relying on layout-specific classes.
   const queue=[document];
+  let scoreRoot=null, feedRoot=null, combinedRoot=null;
+  const probe={shadowRoots:0,scoreRoots:0,feedRoots:0,matchedRoots:0};
   while(queue.length){
     const node=queue.shift();
-    if(node instanceof ShadowRoot && node.querySelector('.bc2-feed '+MATCH+' .bc2-score'))return node;
-    node.querySelectorAll?.('*').forEach(el=>{if(el.shadowRoot)queue.push(el.shadowRoot)});
+    if(node instanceof ShadowRoot){
+      probe.shadowRoots++;
+      const scores=!!node.querySelector('.bc2-score');
+      const feed=!!node.querySelector('.bc2-feed');
+      const matches=!!node.querySelector('a[href*="/sports/soccer/"]');
+      if(scores){probe.scoreRoots++;scoreRoot ||= node}
+      if(feed){probe.feedRoots++;feedRoot ||= node}
+      if(scores && matches){probe.matchedRoots++;combinedRoot ||= node}
+      if(feed && scores && matches) {
+        rootProbe=probe;
+        return node;
+      }
+    }
+    node.querySelectorAll?.('*').forEach(el=>{
+      if(el.shadowRoot)queue.push(el.shadowRoot);
+    });
   }
-  return null;
+  rootProbe=probe;
+  return combinedRoot || feedRoot || scoreRoot;
 }
 function isBell(bell){
   return [...bell.querySelectorAll('svg path')].some(path=>
@@ -76,10 +95,17 @@ function tick(){
   if(!root?.host?.isConnected){
     detach();
     root=findRoot();
-    if(!root){message='Waiting for bc2-feed Shadow DOM';return;}
+    if(!root){message='Waiting for sports Shadow DOM ('+
+      rootProbe.shadowRoots+' roots scanned, '+
+      rootProbe.scoreRoots+' with scores)';return;}
   }
   if(!root.querySelector('.bc2-feed')){
-    message='Waiting for league groups';return;
+    const found=findRoot();
+    if(found && found!==root){detach();root=found}
+    if(!root?.querySelector('.bc2-feed')){
+      message='Waiting for league feed in detected Shadow DOM';
+      return;
+    }
   }
   if(!style?.isConnected){
     style=document.createElement('style');
@@ -99,6 +125,8 @@ function status(){
   return {
     version:VERSION,running:active,pageMatches:livePage(),
     shadowRootReady:!!root,
+    rootProbe,
+    styleInstalled:!!style?.isConnected,
     layoutActive:!!style?.isConnected && !!feed && !!group && !!event,
     layoutMode:'CSS on original bc2-feed',
     leagues:feed?.querySelectorAll('.bc2-group').length||0,
