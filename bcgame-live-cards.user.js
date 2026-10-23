@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BC.GAME — LIVE Football Cards
 // @namespace    https://github.com/blatokomitet/bcgame-design
-// @version      1.0.2
+// @version      1.0.3
 // @description  Refine existing BC.GAME football live cards: smaller muted league logos, larger red score, no in-card bells
 // @match        https://bcgame.st/*
 // @match        https://*.bcgame.st/*
@@ -93,6 +93,69 @@
       r.top >= gr.top + 53 && r.bottom <= gr.bottom - 4;
   }
 
+
+  // Identify the bell relative to the two visible score digits. The bell can
+  // be outside the per-match DOM group, so DOM-only descendant searches miss it.
+  // Read-only hit testing is narrowly limited to the right of those score digits.
+  function findBellByGeometry(group) {
+    const scores = [...group.querySelectorAll(MATCH_LINK + ' ' + SCORE)]
+      .map(rect).filter(visible).sort((a, b) => a.top - b.top);
+    if (scores.length !== 2 || !root?.elementsFromPoint) return null;
+
+    const scoreRight = Math.max(...scores.map(r => r.right));
+    const middleY = ((scores[0].top + scores[0].bottom) +
+                     (scores[1].top + scores[1].bottom)) / 4;
+    let best = null;
+    let bestDistance = Infinity;
+
+    // The visual circle in BC.GAME is to the RIGHT of the score column.
+    for (const dx of [25, 35, 45, 55, 65, 75, 85]) {
+      for (const dy of [0, -10, 10]) {
+        const x = scoreRight + dx, y = middleY + dy;
+        if (x >= innerWidth - 3 || y <= 0 || y >= innerHeight) continue;
+        for (const target of root.elementsFromPoint(x, y)) {
+          let el = target;
+          for (let depth = 0; el && depth < 8; depth++, el = el.parentElement) {
+            if (el === group || el === root.host ||
+                el.hasAttribute('data-bc-live-bell-v1')) continue;
+            const b = rect(el);
+            if (!visible(b) || b.width < 28 || b.width > 75 ||
+                b.height < 28 || b.height > 75 ||
+                Math.abs(b.width - b.height) > 12) continue;
+
+            const centerX = b.left + b.width / 2;
+            const centerY = b.top + b.height / 2;
+            if (centerX < scoreRight + 17 || centerX > scoreRight + 105 ||
+                Math.abs(centerY - middleY) > 26) continue;
+
+            const cs = getComputedStyle(el);
+            const corner = cs.borderTopLeftRadius;
+            const radius = parseFloat(corner) || 0;
+            const rounded = corner.includes('%') ?
+              radius >= 40 : radius >= Math.min(b.width, b.height) * .32;
+            if (!rounded) continue;
+            const border = parseFloat(cs.borderTopWidth) > 0 ||
+                           parseFloat(cs.borderLeftWidth) > 0;
+            const icon = !!el.querySelector('svg') ||
+                         /bell|alarm|notif|уведом/i.test(
+                            (el.getAttribute('aria-label') || '') + ' ' +
+                            (el.className?.baseVal || el.className || '')
+                          );
+            if (!border && !icon) continue;
+            const distance = Math.abs(centerY - middleY) * 1.5 +
+              Math.abs(centerX - (scoreRight + 43)) +
+              Math.abs(b.width - 42) * .3;
+            if (distance < bestDistance) {
+              best = el;
+              bestDistance = distance;
+            }
+          }
+        }
+      }
+    }
+    return best;
+  }
+
   function markInCardBell(group) {
     const gr = rect(group);
     if (!visible(gr)) return;
@@ -141,6 +204,7 @@
         bell = slot;
       }
     }
+    if (!bell) bell = findBellByGeometry(group);
     if (bell && !bell.hasAttribute('data-bc-live-bell-v1')) {
       bell.setAttribute('data-bc-live-bell-v1', '');
       bells.add(bell);
@@ -180,6 +244,9 @@
     style = document.createElement('style');
     style.id = 'bc-live-cards-installed-v1';
     style.textContent = `
+      ${GROUP} ${MATCH_LINK} .sc-7l8my2-0 {
+        transform: none !important;
+      }
       ${GROUP} ${MATCH_LINK} ${SCORE} {
         font-size: 36px !important;
         line-height: 1 !important;
@@ -239,6 +306,18 @@
       mutedLeagueIcons: [...leagueIcons].filter(el => el.isConnected).length,
       hiddenCardBells: [...bells].filter(el => el.isConnected).length,
       scoreFontSize: '36px',
+      version: '1.0.3',
+      sampleScore: (() => {
+        const el = root?.querySelector(GROUP + ' ' + MATCH_LINK + ' ' + SCORE);
+        if (!el) return null;
+        const b = el.getBoundingClientRect();
+        return {
+          text: el.textContent?.trim().slice(0, 12),
+          computedFont: getComputedStyle(el).fontSize,
+          height: Math.round(b.height),
+          width: Math.round(b.width)
+        };
+      })(),
       otherScriptsChanged: false
     };
   }
